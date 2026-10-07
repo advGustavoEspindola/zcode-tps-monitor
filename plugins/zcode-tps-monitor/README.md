@@ -8,10 +8,11 @@
 |---|---|---|
 | 本问统计 | `hooks/prompt-submit.mjs` + `scripts/token-rate.mjs` | 每轮注入「本问统计指令」:模型在回复收尾时运行 `token-rate.mjs --turn --current`,把本问即时速率行附在回复末尾;`--current` 守卫保证绝不显示上一轮。`{"tokenRateLine": false}` 可整体关闭 |
 | 上下文注入 | `hooks/prompt-submit.mjs` | 每轮读取 ZCode usage 数据库,注入上一轮速率作为模型内部参考(标注勿展示);随 tokenRateLine 一并关闭 |
-| 会话提示 | `hooks/session-start.mjs` | 会话启动时记录会话 ID,并注入使用提示(收尾自测机制说明) |
+| 会话提示 | `hooks/session-start.mjs` | 会话启动时记录会话 ID,并注入使用提示(收尾自测机制说明);后台拉起 `ensure-ui.mjs` |
+| UI 自举 | `hooks/ensure-ui.mjs` | SessionStart 后台确保大屏 `:7423` 与桌面 tok/s 条在跑(缺失才启动,失败静默) |
 | 自检 | `/tps-doctor`(`scripts/doctor.mjs`) | 检查 Node 版本、数据库与表结构、状态/配置文件、大屏进程;`--json` 可编程消费 |
 | 实时大屏 | `dashboard/server.mjs` | 浏览器监控面板,秒级自动刷新,含「最新一问(本问)」实时卡片;`/zcode-tps-monitor:dashboard` 拉起,或手动运行 |
-| 悬浮条 | `dashboard/overlay.ps1` | Windows 桌面常驻文字悬浮条 |
+| tok/s 条 | `dashboard/overlay.ps1` | Windows 上贴在 ZCode composer 底部的 StatsLine(estilo DSH):灰字、无背景、单实例、跟随主窗口 |
 | 斜杠命令 | `/zcode-tps-monitor:tps` | 即时快照;`/zcode-tps-monitor:tps 10` 采样观察 10 秒 |
 | 技能 | `zcode-tps-monitor` | 用户询问速率/TPS 相关问题时自动触发 |
 | MCP 工具 | `tps_snapshot` / `tps_watch` | stdio MCP server(`mcp/tps-server.mjs`),供 agent 程序化取数 |

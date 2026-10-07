@@ -90,13 +90,15 @@ test("窗口统计与会话累计(独立 SUM,不受窗口限制)", () => {
   assert.equal(r.session.totalOutput, 1720);   // 500+900+80+20+220(含无效速率行)
   assert.equal(r.session.totalReasoning, 100);
   assert.equal(r.session.requests, 5);         // 5 条 main_turn(sub 不计)
+  assert.equal(r.session.turns, 2);            // t_old + t_new(COUNT DISTINCT turn_id)
+  assert.equal(r.session.avgTtftMs, 530);      // (800+700+450+100+600)/5
 });
 
 test("行文案:上轮标注、思考 token、会话累计", () => {
   const line = formatLine(query("s1"));
-  assert.match(line, /\(上轮\)/);
-  assert.match(line, /近4次均 315 \/ 峰 600/);
-  assert.match(line, /累计 1\.8k tok/);         // 1720+100
+  assert.match(line, /\(turno anterior\)/);
+  assert.match(line, /med\. 4 315 \/ pico 600/);
+  assert.match(line, /acumulado 1\.8k tok/);    // 1720+100
 });
 
 test("本轮统计:按最新 turn_id 圈定,多段加权速率", () => {
@@ -114,11 +116,11 @@ test("本轮统计:按最新 turn_id 圈定,多段加权速率", () => {
 
 test("本轮文案:本轮标注、段数峰值、会话累计", () => {
   const line = formatTurnLine(queryTurn("s1"));
-  assert.match(line, /⚡ 187\.5 tok\/s\(本轮\)/);
-  assert.match(line, /首字 0\.5s/);
-  assert.match(line, /输出 320 tok \/ 生成/);
-  assert.match(line, /3 段 \/ 峰 200/);
-  assert.match(line, /累计 1\.8k tok/);
+  assert.match(line, /⚡ 187\.5 tok\/s \(este turno\)/);
+  assert.match(line, /TTFT 0\.5s/);
+  assert.match(line, /saida 320 tok \/ geracao/);
+  assert.match(line, /3 etapas \/ pico 200/);
+  assert.match(line, /acumulado 1\.8k tok/);
 });
 
 test("--current 守卫:提问时刻晚于本轮全部数据 → 不返回本问(绝不拿上一轮冒充)", () => {
@@ -129,7 +131,7 @@ test("--current 守卫:提问时刻晚于本轮全部数据 → 不返回本问(
   const r = queryTurn("s1", { current: true });
   assert.equal(r.noCurrentTurnData, true);
   assert.equal(r.turn, null);
-  assert.equal(formatTurnLine(r), "暂无本轮请求记录");
+  assert.equal(formatTurnLine(r), "sem dados deste turno");
 });
 
 test("--current 守卫:本问已有入库数据 → 正常返回", () => {

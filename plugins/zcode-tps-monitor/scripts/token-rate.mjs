@@ -69,9 +69,16 @@ function resolveSession(db, sessionId) {
 
 // 主对话优先的过滤范围:有 main_turn 数据时只统计 main_turn,否则回退为全部请求
 function scopeFor(db, sid) {
+  // turn_id 仅在列存在时投影:旧版客户端的库没有该列,SELECT 引用会整句失败;
+  // 会话累计的 COUNT(DISTINCT turn_id) 依赖该投影
+  let turnCol = "";
+  try {
+    const cols = db.prepare("PRAGMA table_info(model_usage)").all();
+    if (cols.some((c) => c.name === "turn_id")) turnCol = ", turn_id";
+  } catch {}
   const base =
     "SELECT model_id, output_tokens, reasoning_tokens, input_tokens, cache_read_input_tokens," +
-    " first_token_at, completed_at, time_to_first_token_ms, status" +
+    " first_token_at, completed_at, time_to_first_token_ms, status" + turnCol +
     " FROM model_usage WHERE status = 'completed' AND query_source = 'main_turn'";
   const args = sid ? [sid] : [];
   const hasMain = db
@@ -111,12 +118,24 @@ function sessionAggregate(db, scopeSql, args, rated) {
   const sumRow = db
     .prepare(
       "SELECT COUNT(*) n, SUM(output_tokens) o, SUM(reasoning_tokens) r," +
-      " SUM(input_tokens) i, SUM(cache_read_input_tokens) c FROM (" + scopeSql + ")"
+      " SUM(input_tokens) i, SUM(cache_read_input_tokens) c," +
+      " AVG(time_to_first_token_ms) ttft," +
+      " SUM(CASE WHEN first_token_at IS NOT NULL AND completed_at > first_token_at THEN completed_at - first_token_at ELSE 0 END) genMs" +
+      " FROM (" + scopeSql + ")"
     )
     .get(...args);
+  // 会话轮次数:COUNT(DISTINCT turn_id);旧库无 turn_id 列时退回请求数
+  let turns = sumRow.n ?? 0;
+  try {
+    const trow = db.prepare("SELECT COUNT(DISTINCT turn_id) t FROM (" + scopeSql + ")").get(...args);
+    if (trow && trow.t != null) turns = trow.t;
+  } catch {}
+  const out = (sumRow.o ?? 0) + (sumRow.r ?? 0);
+  const genMs = sumRow.genMs ?? 0;
   return {
     samples: rated.length,
     requests: sumRow.n ?? 0,
+    turns,
     avg: Math.round((rated.reduce((s, i) => s + i.tokPerSec, 0) / rated.length) * 10) / 10,
     max: Math.max(...rated.map((i) => i.tokPerSec)),
     min: Math.min(...rated.map((i) => i.tokPerSec)),
@@ -124,6 +143,9 @@ function sessionAggregate(db, scopeSql, args, rated) {
     totalReasoning: sumRow.r ?? 0,
     totalInput: sumRow.i ?? 0,
     totalCacheRead: sumRow.c ?? 0,
+    avgTtftMs: sumRow.ttft != null ? Math.round(sumRow.ttft) : null,
+    totalGenMs: genMs,
+    tokPerSec: genMs >= MIN_GEN_MS && out > 0 ? Math.round((out / genMs) * 10000) / 10 : null,
   };
 }
 
@@ -233,17 +255,17 @@ function fmtNum(n) {
 
 function formatLine(r) {
   const l = r.latest;
-  if (!l) return "暂无已完成的模型请求";
-  const t = new Date(l.completedAt).toLocaleTimeString("zh-CN", { hour12: false });
+  if (!l) return "sem requisicoes concluidas";
+  const t = new Date(l.completedAt).toLocaleTimeString("pt-BR", { hour12: false });
   const parts = [
     // 采样发生在发送消息的瞬间,头条描述的是上一条已完成回复
-    `⚡ ${l.tokPerSec ?? "-"} tok/s(上轮)`,
-    `首字 ${l.ttftMs != null ? (l.ttftMs / 1000).toFixed(1) : "-"}s`,
-    `输出 ${fmtNum(l.outputTokens)}${l.reasoningTokens ? `(+${fmtNum(l.reasoningTokens)} 思考)` : ""} tok / 生成 ${l.genMs != null ? (l.genMs / 1000).toFixed(1) : "-"}s`,
+    `⚡ ${l.tokPerSec ?? "-"} tok/s (turno anterior)`,
+    `TTFT ${l.ttftMs != null ? (l.ttftMs / 1000).toFixed(1) : "-"}s`,
+    `saida ${fmtNum(l.outputTokens)}${l.reasoningTokens ? `(+${fmtNum(l.reasoningTokens)} raciocinio)` : ""} tok / geracao ${l.genMs != null ? (l.genMs / 1000).toFixed(1) : "-"}s`,
   ];
   if (r.session) {
-    parts.push(`近${r.session.samples}次均 ${r.session.avg} / 峰 ${r.session.max}`);
-    parts.push(`累计 ${fmtCompact(r.session.totalOutput + r.session.totalReasoning)} tok`);
+    parts.push(`med. ${r.session.samples} ${r.session.avg} / pico ${r.session.max}`);
+    parts.push(`acumulado ${fmtCompact(r.session.totalOutput + r.session.totalReasoning)} tok`);
   }
   parts.push(`⏱ ${t}`);
   return parts.join(" · ");
@@ -252,16 +274,16 @@ function formatLine(r) {
 // 本问统计行(回复收尾自测、Stop 钩子、监控大屏共用)
 function formatTurnLine(r) {
   const t = r.turn;
-  if (!t) return "暂无本轮请求记录";
-  const time = new Date(t.lastAt).toLocaleTimeString("zh-CN", { hour12: false });
+  if (!t) return "sem dados deste turno";
+  const time = new Date(t.lastAt).toLocaleTimeString("pt-BR", { hour12: false });
   const parts = [
     // 采样发生在回复刚结束的瞬间,头条即本轮即时速率
-    `⚡ ${t.tokPerSec ?? "-"} tok/s(本轮)`,
-    `首字 ${t.ttftMs != null ? (t.ttftMs / 1000).toFixed(1) : "-"}s`,
-    `输出 ${fmtNum(t.totalOutput)}${t.totalReasoning ? `(+${fmtNum(t.totalReasoning)} 思考)` : ""} tok / 生成 ${t.genMs > 0 ? (t.genMs / 1000).toFixed(1) : "-"}s`,
+    `⚡ ${t.tokPerSec ?? "-"} tok/s (este turno)`,
+    `TTFT ${t.ttftMs != null ? (t.ttftMs / 1000).toFixed(1) : "-"}s`,
+    `saida ${fmtNum(t.totalOutput)}${t.totalReasoning ? `(+${fmtNum(t.totalReasoning)} raciocinio)` : ""} tok / geracao ${t.genMs > 0 ? (t.genMs / 1000).toFixed(1) : "-"}s`,
   ];
-  if (t.requests > 1) parts.push(`${t.requests} 段 / 峰 ${t.peak ?? "-"}`);
-  if (r.session) parts.push(`累计 ${fmtCompact(r.session.totalOutput + r.session.totalReasoning)} tok`);
+  if (t.requests > 1) parts.push(`${t.requests} etapas / pico ${t.peak ?? "-"}`);
+  if (r.session) parts.push(`acumulado ${fmtCompact(r.session.totalOutput + r.session.totalReasoning)} tok`);
   parts.push(`⏱ ${time}`);
   return parts.join(" · ");
 }
@@ -286,7 +308,7 @@ if (process.argv[1] && process.argv[1].endsWith("token-rate.mjs")) {
       console.log(formatLine(r));
       if (s) {
         // CLI 明细面向细读,全部千分位精确数字
-        console.log(`会话累计:输出 ${fmtNum(s.totalOutput)}${s.totalReasoning ? `(+${fmtNum(s.totalReasoning)} 思考)` : ""} tok · 输入 ${fmtNum(s.totalInput)} tok(其中缓存读 ${fmtNum(s.totalCacheRead)}) · 请求 ${s.requests} 次`);
+        console.log(`sessao: saida ${fmtNum(s.totalOutput)}${s.totalReasoning ? `(+${fmtNum(s.totalReasoning)} raciocinio)` : ""} tok · entrada ${fmtNum(s.totalInput)} tok (cache ${fmtNum(s.totalCacheRead)}) · ${s.requests} req`);
       }
     }
   }

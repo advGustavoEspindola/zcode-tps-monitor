@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.8.6 — 2026-10-07
+
+### 合并:pt-BR 运行时线(本地曾以 0.8.3 名义安装)并入主线
+用户侧实际在用的是一条基于 0.8.2 的本地改进线(界面文案全部 pt-BR、桌面 tok/s 条重写、会话自举 UI、会话统计增强),版本号曾局部标为 0.8.3——与本仓库 0.8.3 是不同内容。本版把该线并入 0.8.5 主线,双方改动全部保留,无回退。
+
+### 新增
+- **pt-BR 运行时文案**:SessionStart 提示、UserPromptSubmit【本问统计指令】、hooks 状态文案、速率行输出(`token-rate.mjs` 的 formatLine/formatTurnLine/CLI 明细)全部改为葡萄牙语(pt-BR);指令保留 0.8.4 的防折叠严格顺序与降级规则、0.8.5 的 `promptTs` 守卫语义,注入的上一轮行改挂 `[contexto interno · nao mostrar]` 前缀。
+- **桌面 tok/s 条重写(`dashboard/overlay.ps1`,estilo DSH)**:改为贴在 ZCode composer 底部的 StatsLine(灰字、无背景、单实例互斥、跟随主窗口),替换原透明悬浮条(仅 Windows)。
+- **`hooks/ensure-ui.mjs` 会话自举**:SessionStart 后台拉起大屏 `:7423` 与桌面 tok/s 条(缺失才启动,失败静默,不阻塞钩子)。
+- **会话统计增强字段**:`turns`(COUNT DISTINCT turn_id)、`avgTtftMs`、`totalGenMs`、`tokPerSec`(总产出/总生成时长,与本轮口径一致);旧库无 `turn_id` 列时按列探测优雅降级(PRAGMA 探测投影,不再整句失败)。
+
+### 变更
+- 速率行标签(现行输出格式):`⚡ … tok/s (este turno)` / `(turno anterior)`、`TTFT …s`、`saida … tok / geracao …s`、`N etapas / pico …`、`acumulado … tok`、`med. N avg / pico max`;README 指标表示例行同步。
+- `.zcode-plugin/plugin.json` 显式声明 `hooks` / `mcpServers`;`userConfig.metrics_url` 增加 `default: ""`。
+- 测试:行文案断言随 pt-BR 更新,新增 `turns` / `avgTtftMs` 断言;14 项全绿(`node --test test/token-rate.test.mjs`)。
+- 备注:效果截图(`docs/effect-token-rate.png`)仍是中文标签时期生成的,仅示意;文字标签以本文与 README 指标表为准。
+
 ## 0.8.5 — 2026-10-04
 
 ### 修复:Stop 钩子触发导致「本问统计」消失
