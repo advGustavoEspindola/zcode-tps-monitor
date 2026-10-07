@@ -1,10 +1,9 @@
 {
   "name": "zcode-tps-monitor",
-  "version": "0.8.6",
-  "description": "Token output-rate monitor for ZCode: shows real instant tokens/sec (from the ZCode usage DB) for the current question at the end of each tool-using reply — never the previous turn — plus a /tps command, MCP tools, and a real-time dashboard; also supports service-TPS monitoring via a configurable metrics URL or demo data.",
+  "version": "0.8.7",
+  "description": "Monitor de taxa de saída de tokens do ZCode: exibe a taxa instantânea real de tokens/s (lida do banco de uso do ZCode) da pergunta atual no fim de cada resposta que usa ferramentas — nunca a do turno anterior — mais o comando /tps, ferramentas MCP e um painel em tempo real; também suporta monitoramento de TPS de negócio via URL de métricas configurável ou dados de demonstração.",
   "description_i18n": {
-    "en": "Token rate monitor: per-question instant tokens/sec from the ZCode usage DB, shown at the end of each tool-using reply; /tps command, MCP tools, and a real-time dashboard. Supports a real metrics URL or built-in demo data for service TPS.",
-    "zh-CN": "ZCode Token 输出速率监控：每条调用了工具的回答末尾自动附本问的即时 tok/s（读取 ZCode usage 数据库，绝不显示上一轮），另有 /tps 命令、MCP 工具与实时大屏；同时支持业务 TPS 监控（可配置指标接口或演示数据）。"
+    "pt-BR": "Monitor de TPS: comando /tps e ferramentas MCP para instantâneo de TPS, percentis de latência, taxa de erro e recursos locais. Aceita URL de métricas real ou dados de demonstração embutidos."
   },
   "author": {
     "name": "Administrator"
@@ -13,9 +12,9 @@
   "keywords": [
     "tps",
     "monitor",
-    "metrics",
-    "performance",
-    "throughput"
+    "métricas",
+    "desempenho",
+    "vazão"
   ],
   "commands": "commands",
   "skills": "skills",
@@ -23,8 +22,8 @@
   "mcpServers": ".mcp.json",
   "userConfig": {
     "metrics_url": {
-      "title": "Metrics URL",
-      "description": "HTTP 接口地址，返回包含 tps/qps 字段的 JSON；留空则使用演示数据。",
+      "title": "URL de métricas",
+      "description": "Endpoint HTTP que retorna JSON com o campo tps/qps; vazio = dados de demonstração.",
       "type": "string",
       "required": false,
       "default": ""

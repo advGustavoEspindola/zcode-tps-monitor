@@ -1,22 +1,22 @@
-// 采集核心:CLI(scripts/collect.mjs)与 MCP server(mcp/tps-server.mjs)共用。
-// 零第三方依赖,要求 Node >= 18(全局 fetch)。
+// Núcleo de coleta: compartilhado entre a CLI (scripts/collect.mjs) e o servidor MCP (mcp/tps-server.mjs).
+// Zero dependências de terceiros, requer Node >= 18 (fetch global).
 
 import os from "node:os";
 
-// ---------- 工具 ----------
+// ---------- Utilidades ----------
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const r1 = (v) => Math.round(v * 10) / 10;
 const r2 = (v) => Math.round(v * 100) / 100;
 
 export function resolveUrl(env = process.env) {
-  // 未配置的 user_config 占位符原样传入时视为未配置
+  // Um placeholder de user_config não configurado, quando passado literalmente, é tratado como não configurado
   const url = (env.TPS_URL || "").trim();
   if (!url || url.startsWith("${")) return null;
   return url;
 }
 
-// ---------- 演示数据(随机游走,数值连续且逼真) ----------
+// ---------- Dados de demonstração (caminhada aleatória, valores contínuos e realistas) ----------
 
 const demo = { tps: 820, p50: 12.4, err: 0.12 };
 
@@ -33,7 +33,7 @@ function demoStep() {
   };
 }
 
-// ---------- 远程接口(字段名宽松匹配,支持一层嵌套) ----------
+// ---------- Interface remota (correspondência flexível de nomes de campo, suporta um nível de aninhamento) ----------
 
 const TPS_KEYS = ["tps", "qps", "throughput", "transactionsPerSecond"];
 const LAT_KEYS = { p50: ["p50", "latency_p50"], p95: ["p95", "latency_p95"], p99: ["p99", "latency_p99"] };
@@ -63,7 +63,7 @@ export async function fetchRemoteMetrics(url, timeoutMs = 5000) {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   const tps = deepFind(data, TPS_KEYS);
-  if (tps === undefined) throw new Error("响应中未找到 tps/qps 字段");
+  if (tps === undefined) throw new Error("Campo tps/qps não encontrado na resposta");
   return {
     tps: Math.round(tps),
     p50: deepFind(data, LAT_KEYS.p50) ?? null,
@@ -73,7 +73,7 @@ export async function fetchRemoteMetrics(url, timeoutMs = 5000) {
   };
 }
 
-// ---------- 本机系统资源(Windows 下 loadavg 恒为 0,用 CPU 时间差采样) ----------
+// ---------- Recursos locais do sistema (no Windows loadavg é sempre 0; usa amostragem por diferença de tempo de CPU) ----------
 
 function cpuTimes() {
   let idle = 0, total = 0;
@@ -109,7 +109,7 @@ async function systemMetrics() {
   };
 }
 
-// ---------- 快照与采样 ----------
+// ---------- Instantâneo e amostragem ----------
 
 export async function snapshot(env = process.env) {
   const url = resolveUrl(env);
@@ -120,7 +120,7 @@ export async function snapshot(env = process.env) {
       mode = "remote";
     } catch (err) {
       m = demoStep();
-      mode = `demo(接口不可用: ${err.message},已回退演示数据)`;
+      mode = `demo(Interface indisponível: ${err.message}, usando dados de demonstração)`;
     }
   } else {
     m = demoStep();
@@ -142,7 +142,7 @@ export async function watch(seconds, env = process.env) {
         samples.push(m);
       } catch (err) {
         mode = "demo";
-        fallbackNote = `接口不可用(${err.message}),已回退演示数据`;
+        fallbackNote = `Interface indisponível (${err.message}), usando dados de demonstração`;
         samples.push(demoStep());
       }
     } else {
@@ -166,35 +166,35 @@ export async function watch(seconds, env = process.env) {
   };
 }
 
-// ---------- 人类可读输出 ----------
+// ---------- Saída legível por humanos ----------
 
 const GB = (mb) => (mb / 1024).toFixed(1);
 
 export function formatSnapshot(s) {
   const t = s.time.replace("T", " ").slice(0, 19);
   const lines = [
-    `⏱ TPS 监控快照  ${t}   [模式: ${s.mode}]`,
-    `  TPS(当前)         : ${s.tps}`,
-    `  延迟 p50/p95/p99   : ${s.p50 ?? "-"} / ${s.p95 ?? "-"} / ${s.p99 ?? "-"} ms`,
-    `  错误率             : ${s.errorRate ?? "-"} %`,
-    `  —— 系统资源 ——`,
-    `  CPU                : ${s.system.cpuPercent ?? "-"} %  (${s.system.cpuCores} 核)`,
-    `  内存               : ${GB(s.system.memUsedMB)} / ${GB(s.system.memTotalMB)} GB (${s.system.memPercent} %)`,
-    `  主机运行时长       : ${s.system.hostUptimeHours} 小时  (${s.system.platform})`,
+    `⏱ Instantâneo do monitor TPS  ${t}   [modo: ${s.mode}]`,
+    `  TPS(atual)         : ${s.tps}`,
+    `  Latência p50/p95/p99 : ${s.p50 ?? "-"} / ${s.p95 ?? "-"} / ${s.p99 ?? "-"} ms`,
+    `  Taxa de erro       : ${s.errorRate ?? "-"} %`,
+    `  —— Recursos do sistema ——`,
+    `  CPU                : ${s.system.cpuPercent ?? "-"} %  (${s.system.cpuCores} núcleos)`,
+    `  Memória            : ${GB(s.system.memUsedMB)} / ${GB(s.system.memTotalMB)} GB (${s.system.memPercent} %)`,
+    `  Tempo de atividade : ${s.system.hostUptimeHours} horas  (${s.system.platform})`,
   ];
   return lines.join("\n");
 }
 
 export function formatWatch(w) {
   const t = w.time.replace("T", " ").slice(0, 19);
-  const head = `⏱ TPS 采样报告  ${t}   [模式: ${w.mode}]  采样 ${w.count} 次 × 1s`;
+  const head = `⏱ Relatório de amostragem TPS  ${t}   [modo: ${w.mode}]  ${w.count} amostras × 1s`;
   const rows = w.samples.map((s, i) => `  #${String(i + 1).padStart(2, "0")}  tps=${String(s.tps).padEnd(6)} p95=${String(s.p95 ?? "-").padEnd(6)} err=${s.errorRate ?? "-"}%`);
   const stat = [
-    `  —— 统计 ——`,
-    `  TPS 平均/最小/最大  : ${w.tps.avg} / ${w.tps.min} / ${w.tps.max}`,
-    `  p95 均值           : ${w.p95avg} ms`,
-    `  p99 均值           : ${w.p99avg} ms`,
-    `  错误率均值         : ${w.errorRateAvg} %`,
+    `  —— Estatísticas ——`,
+    `  TPS médio/mín/máx  : ${w.tps.avg} / ${w.tps.min} / ${w.tps.max}`,
+    `  média de p95       : ${w.p95avg} ms`,
+    `  média de p99       : ${w.p99avg} ms`,
+    `  média da taxa de erro : ${w.errorRateAvg} %`,
   ];
   return [head, ...rows, ...stat].join("\n");
 }

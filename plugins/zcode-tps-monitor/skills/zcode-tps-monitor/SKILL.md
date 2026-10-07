@@ -1,33 +1,33 @@
 ---
 name: zcode-tps-monitor
-description: Token 输出速率与吞吐监控。当用户询问 token 速率、生成速度、tok/s、模型输出快慢、TTFT(首 token 延迟),或 TPS、QPS、吞吐、接口延迟、想看实时监控大屏时使用。Token 速率读取 ZCode usage 数据库,是真实数据;业务 TPS 支持指标接口或演示数据。
+description: Monitoramento de taxa de saída de token e throughput (vazão). Use quando o usuário perguntar sobre taxa de token, velocidade de geração, tok/s, rapidez da saída do modelo, TTFT (latência do primeiro token), ou TPS, QPS, throughput/vazão, latência de interface, ou quiser ver o dashboard de monitoramento em tempo real. A taxa de token lê o banco de dados de uso do ZCode e é dado real; o TPS de negócio aceita um endpoint de métricas ou dados de demonstração.
 ---
 
-# TPS Monitor(token 速率 + 业务吞吐)
+# TPS Monitor (taxa de tokens + throughput de negócio)
 
-两类指标:
+Há dois tipos de métricas:
 
-- **Token 输出速率(真实)** — 从 ZCode 自身 usage 数据库(`model_usage` 表)计算:每轮的 tok/s、输出 token 数、生成耗时、TTFT、会话平均/峰值。用户问"生成速度/token 速率/tok/s"时用这个。
-- **业务 TPS(demo/remote)** — 未配置接口时为演示数据;配置 `metrics_url` 后为真实业务吞吐。
+- **Taxa de saída de tokens (real)** — calculada a partir do próprio banco de dados de uso do ZCode (tabela `model_usage`): tok/s por turno, número de tokens de saída, tempo de geração, TTFT, média/pico da sessão. Use esta quando o usuário perguntar "velocidade de geração/taxa de tokens/tok/s".
+- **TPS de negócio (demo/remote)** — sem endpoint configurado, são dados de demonstração; com `metrics_url` configurado, é o throughput real do negócio.
 
-## 取数方式
+## Como obter os dados
 
-1. Token 速率(推荐,真实数据):
+1. Taxa de tokens (recomendada, dados reais):
    ```
-   node <插件目录>/scripts/token-rate.mjs                  # 最近一次请求 + 会话统计
-   node <插件目录>/scripts/token-rate.mjs --turn --current # 最新一问(本问)即时统计
-   node <插件目录>/scripts/token-rate.mjs --json           # JSON
+   node <diretório do plugin>/scripts/token-rate.mjs                  # requisição mais recente + estatísticas da sessão
+   node <diretório do plugin>/scripts/token-rate.mjs --turn --current # estatística instantânea da pergunta mais recente (atual)
+   node <diretório do plugin>/scripts/token-rate.mjs --json           # JSON
    ```
-   可设 `ZCODE_SESSION_ID` 环境变量只统计当前会话;钩子已自动这么做。
-2. 业务 TPS:MCP 工具 `tps_snapshot`/`tps_watch`,或 `node <插件目录>/scripts/collect.mjs [--watch N]`。
-3. 实时大屏(浏览器,含 token 速率面板与本问进行中速率):
+   É possível definir a variável de ambiente `ZCODE_SESSION_ID` para contar apenas a sessão atual; os hooks já fazem isso automaticamente.
+2. TPS de negócio: ferramentas MCP `tps_snapshot`/`tps_watch`, ou `node <diretório do plugin>/scripts/collect.mjs [--watch N]`.
+3. Dashboard em tempo real (no navegador, com o painel de taxa de tokens e a taxa em andamento da pergunta atual):
    ```
-   node <插件目录>/dashboard/server.mjs   # http://127.0.0.1:7423
+   node <diretório do plugin>/dashboard/server.mjs   # http://127.0.0.1:7423
    ```
 
-## 展示规范
+## Regras de apresentação
 
-- 中文回复,指标用表格或列表;token 速率需注明模型名;TTFT 明显偏高(>5s)或速率骤降时可一句简评。
-- 若上下文含【本轮统计指令】:先运行脚本,再输出完整回复,把输出行原样放入引用块附在该条回复最末尾;统计行绝不单独成条、正文写完后绝不补调工具(客户端会折叠带工具的消息);脚本没有输出则不显示任何统计行。
-- 上下文里【内部背景·勿展示】的历史速率行仅供了解背景,绝不展示给用户。
-- demo 模式的业务 TPS 要主动标注,并提示可配置 `metrics_url`。
+- Responda em português do Brasil, apresentando as métricas em tabelas ou listas; na taxa de tokens, informe o nome do modelo; se o TTFT estiver claramente alto (>5s) ou a taxa despencar, inclua um breve comentário.
+- Se o contexto contiver a marcação `[estatistica deste turno]`: primeiro execute o script e depois produza a resposta completa, colocando a linha de saída literalmente em um bloco de citação no final exato dessa resposta; a linha de estatística nunca deve vir como mensagem isolada, e nenhuma ferramenta deve ser chamada depois de o corpo do texto estar pronto (o cliente recolhe mensagens com ferramentas); se o script não retornar saída, não exiba nenhuma linha de estatística.
+- As linhas de taxa históricas com o prefixo `[contexto interno · nao mostrar]` no contexto servem apenas para dar background e nunca devem ser mostradas ao usuário.
+- No modo demo, o TPS de negócio deve ser sinalizado explicitamente, com o aviso de que é possível configurar `metrics_url`.

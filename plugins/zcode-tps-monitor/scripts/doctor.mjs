@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-// 自检:检查插件运行依赖的各个环节,定位"速率行不见了"之类的问题。
-// 用法:
-//   node scripts/doctor.mjs           人类可读
-//   node scripts/doctor.mjs --json    JSON(供程序消费)
-// 退出码:存在 ❌ 项时为 1,否则 0。
+// Autodiagnóstico: verifica cada etapa da qual o plugin depende para funcionar e localiza problemas
+// do tipo "a linha de taxa sumiu".
+// Uso:
+//   node scripts/doctor.mjs           legível por humanos
+//   node scripts/doctor.mjs --json    JSON (para consumo por programa)
+// Código de saída: 1 se houver itens ❌, caso contrário 0.
 
 import fs from "node:fs";
 import os from "node:os";
@@ -20,7 +21,7 @@ const STATE_FILE =
 const CONFIG_FILE = path.join(HOME, ".zcode", "tps-monitor.config.json");
 const PID_FILE = path.join(HOME, ".zcode", "tps-monitor.dashboard.pid");
 
-// 钩子查询依赖的列(model_usage 表)
+// Colunas das quais a consulta do hook depende (tabela model_usage)
 const REQUIRED_COLS = [
   "session_id", "status", "query_source", "model_id",
   "output_tokens", "reasoning_tokens", "input_tokens", "cache_read_input_tokens",
@@ -31,46 +32,46 @@ function nodeVersionCheck() {
   const [maj, min] = process.versions.node.split(".").map(Number);
   const ok = maj > 22 || (maj === 22 && min >= 5);
   return {
-    name: "Node 版本",
+    name: "Versão do Node",
     ok,
-    detail: `当前 ${process.versions.node},需要 ≥ 22.5(内置 node:sqlite)`,
-    hint: ok ? null : "升级 Node 后重试:nvm install 22 / 官网安装最新 LTS",
+    detail: `Atual ${process.versions.node}, requer ≥ 22.5 (node:sqlite embutido)`,
+    hint: ok ? null : "Atualize o Node e tente novamente: nvm install 22 / instale o LTS mais recente no site oficial",
   };
 }
 
 async function dbCheck() {
   if (!fs.existsSync(DB_PATH)) {
     return {
-      name: "usage 数据库",
+      name: "Banco de dados de uso",
       ok: false,
-      detail: `未找到 ${DB_PATH}`,
-      hint: "若 ZCode 数据不在默认位置,设置环境变量 ZCODE_USAGE_DB 指向 db.sqlite",
+      detail: `Não encontrado ${DB_PATH}`,
+      hint: "Se os dados do ZCode não estiverem no local padrão, defina a variável de ambiente ZCODE_USAGE_DB apontando para db.sqlite",
     };
   }
   let db;
   try {
-    // 动态加载,避免不支持 node:sqlite 的 Node 在 import 阶段就崩
+    // Carregamento dinâmico, para evitar que um Node sem node:sqlite quebre já na fase de import
     const { DatabaseSync } = await import("node:sqlite");
     db = new DatabaseSync(DB_PATH, { readOnly: true });
   } catch (e) {
     return {
-      name: "usage 数据库",
+      name: "Banco de dados de uso",
       ok: false,
-      detail: `无法只读打开 ${DB_PATH}: ${e.message}`,
-      hint: "确认文件为 SQLite 格式且未被独占锁定",
+      detail: `Não foi possível abrir ${DB_PATH} somente para leitura: ${e.message}`,
+      hint: "Confirme que o arquivo está em formato SQLite e não está travado em uso exclusivo",
     };
   }
   try {
     const cols = db.prepare("PRAGMA table_info(model_usage)").all().map((c) => c.name);
     if (!cols.length) {
-      return { name: "usage 数据库", ok: false, detail: "model_usage 表不存在", hint: "ZCode 版本过旧或尚未产生用量数据;发一条消息后再试" };
+      return { name: "Banco de dados de uso", ok: false, detail: "A tabela model_usage não existe", hint: "A versão do ZCode é muito antiga ou ainda não gerou dados de uso; envie uma mensagem e tente novamente" };
     }
     const missing = REQUIRED_COLS.filter((c) => !cols.includes(c));
     if (missing.length) {
       return {
-        name: "usage 数据库", ok: false,
-        detail: `model_usage 缺少列: ${missing.join(", ")}`,
-        hint: "ZCode 版本变更了表结构,请升级插件或反馈 issue",
+        name: "Banco de dados de uso", ok: false,
+        detail: `Faltam colunas em model_usage: ${missing.join(", ")}`,
+        hint: "A versão do ZCode mudou a estrutura da tabela; atualize o plugin ou relate um issue",
       };
     }
     const last = db
@@ -78,9 +79,9 @@ async function dbCheck() {
       .get();
     const ageMin = last ? Math.round((Date.now() - last.completed_at) / 60000) : null;
     return {
-      name: "usage 数据库",
+      name: "Banco de dados de uso",
       ok: true,
-      detail: `表结构完整;最近完成样本 ${ageMin == null ? "无" : ageMin + " 分钟前"}`,
+      detail: `Estrutura da tabela completa; amostra concluída mais recente: ${ageMin == null ? "nenhuma" : ageMin + " minutos atrás"}`,
       hint: null,
     };
   } finally {
@@ -92,22 +93,23 @@ function stateFileCheck() {
   try {
     const st = JSON.parse(fs.readFileSync(STATE_FILE, "utf8"));
     const age = Math.round((Date.now() - (st.ts || 0)) / 60000);
-    // ts 是「本问统计」--current 守卫的依据:缺失则守卫退化为放行,可能显示旧数据
+    // ts é a base da guarda --current da "estatística desta pergunta": sem ela, a guarda degrada para
+    // permitir, podendo exibir dados antigos
     const hasTs = Number.isFinite(st.ts);
     return {
-      name: "会话状态文件",
+      name: "Arquivo de estado da sessão",
       ok: hasTs,
       detail:
-        `存在,sessionId=${String(st.sessionId).slice(0, 8)}…,更新于 ${age} 分钟前` +
-        (hasTs ? "" : ",但缺少提问时间戳"),
-      hint: hasTs ? null : "状态文件由旧版本钩子写入;重发一条消息让新钩子重写即可修复",
+        `Existe, sessionId=${String(st.sessionId).slice(0, 8)}…, atualizado há ${age} minutos` +
+        (hasTs ? "" : ", mas sem o timestamp da pergunta"),
+      hint: hasTs ? null : "O arquivo de estado foi escrito por um hook de versão antiga; reenvie uma mensagem para que o novo hook o reescreva e corrija",
     };
   } catch {
     return {
-      name: "会话状态文件",
+      name: "Arquivo de estado da sessão",
       ok: false,
-      detail: "不存在或不可读",
-      hint: "钩子未运行过:确认插件已安装且会话已重开(钩子在安装/更新后需新会话才注册)",
+      detail: "Não existe ou não pode ser lido",
+      hint: "O hook nunca rodou: confirme que o plugin está instalado e que a sessão foi reaberta (hooks são registrados apenas em novas sessões após instalação/atualização)",
     };
   }
 }
@@ -118,32 +120,32 @@ function configCheck() {
     const off = cfg.tokenRateLine === false;
     const direct = cfg.stopHookLine === true;
     return {
-      name: "配置文件",
+      name: "Arquivo de configuração",
       ok: true,
       detail:
         off
-          ? "tokenRateLine=false,速率行注入已关闭(属预期)"
-          : "已读取,注入开启" + (direct ? ";stopHookLine=true,Stop 直显实验开启" : ""),
-      hint: off ? "如需恢复注入,删除该文件或改回 true" : null,
+          ? "tokenRateLine=false, injeção da linha de taxa desativada (comportamento esperado)"
+          : "Lido, injeção ativada" + (direct ? "; stopHookLine=true, exibição direta do Stop (experimental) ativada" : ""),
+      hint: off ? "Para reativar a injeção, exclua o arquivo ou volte para true" : null,
     };
   } catch {
-    return { name: "配置文件", ok: true, detail: "未配置(默认注入开启)", hint: null };
+    return { name: "Arquivo de configuração", ok: true, detail: "Não configurado (injeção ativada por padrão)", hint: null };
   }
 }
 
 function dashboardCheck() {
   try {
     const pid = Number(fs.readFileSync(PID_FILE, "utf8").trim());
-    process.kill(pid, 0); // 探活
+    process.kill(pid, 0); // testa se o processo está vivo
     const stopCmd = process.platform === "win32" ? `taskkill /PID ${pid} /F` : `kill ${pid}`;
     return {
-      name: "大屏进程",
+      name: "Processo do painel",
       ok: true,
-      detail: `运行中(PID ${pid})`,
-      hint: `如需停止:${stopCmd}`,
+      detail: `Em execução (PID ${pid})`,
+      hint: `Para parar: ${stopCmd}`,
     };
   } catch {
-    return { name: "大屏进程", ok: true, detail: "未运行", hint: null };
+    return { name: "Processo do painel", ok: true, detail: "Não está em execução", hint: null };
   }
 }
 
@@ -167,7 +169,7 @@ if (process.argv[1] && process.argv[1].endsWith("doctor.mjs")) {
       console.log(`${c.ok ? "✅" : "❌"} ${c.name}:${c.detail}`);
       if (c.hint) console.log(`   ↳ ${c.hint}`);
     }
-    console.log(report.failed ? `\n${report.failed} 项未通过` : "\n全部通过");
+    console.log(report.failed ? `\n${report.failed} item(ns) não passou(ram)` : "\nTodos os itens passaram");
   }
   process.exitCode = report.failed ? 1 : 0;
 }

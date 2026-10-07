@@ -1,5 +1,5 @@
 {
-  "description": "zcode-tps-monitor: session greeting + per-turn live metrics",
+  "description": "zcode-tps-monitor: saudação de sessão + métricas ao vivo por turno",
   "hooks": {
     "SessionStart": [
       {

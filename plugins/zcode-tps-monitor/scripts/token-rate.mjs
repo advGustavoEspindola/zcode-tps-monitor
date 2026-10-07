@@ -1,19 +1,22 @@
 #!/usr/bin/env node
-// Token 输出速率:从 ZCode 自身的 usage 数据库(model_usage 表)计算真实的模型生成速率。
-// 用法:
-//   node token-rate.mjs            最近一次请求 + 会话统计(人类可读)
-//   node token-rate.mjs --turn     最新一问(本次提问触发的轮次)即时速率
+// Taxa de saída de tokens: calcula a verdadeira taxa de geração do modelo a partir do próprio banco
+// de dados de uso do ZCode (tabela model_usage).
+// Uso:
+//   node token-rate.mjs            última requisição + estatísticas da sessão (legível por humanos)
+//   node token-rate.mjs --turn     taxa instantânea da última pergunta (turno disparado por esta pergunta)
 //   node token-rate.mjs --turn --current
-//                                  同上,但本问尚无入库数据时输出为空(--current 守卫,
-//                                  绝不把上一轮数据当作本问返回)
-//   node token-rate.mjs --json     JSON 输出
-//   ZCODE_SESSION_ID=xxx node ...  只统计指定会话
-//   ZCODE_USAGE_DB=/path/db.sqlite 指定数据库路径(默认按用户主目录解析)
-//   TPS_MONITOR_STATE_FILE=/path   指定钩子状态文件(默认 ~/.zcode/tps-monitor.last-session.json)
-// 只读打开 WAL 数据库,不影响运行中的客户端。
+//                                  idem, mas com saída vazia quando esta pergunta ainda não tem dados no
+//                                  banco (guarda --current: nunca retorna dados do turno anterior como
+//                                  se fossem desta pergunta)
+//   node token-rate.mjs --json     saída em JSON
+//   ZCODE_SESSION_ID=xxx node ...  considera apenas a sessão especificada
+//   ZCODE_USAGE_DB=/path/db.sqlite define o caminho do banco (por padrão resolvido no diretório do usuário)
+//   TPS_MONITOR_STATE_FILE=/path   define o arquivo de estado do hook (padrão ~/.zcode/tps-monitor.last-session.json)
+// Abre o banco WAL somente para leitura, sem afetar o cliente em execução.
 
-// 抑制 node:sqlite 的 ExperimentalWarning 噪音:必须在动态 import 之前接管 warning 通道
-// (静态 import 的内置模块在模块体执行前就已求值,届时再监听就晚了)。
+// Suprime o ruído do ExperimentalWarning do node:sqlite: é preciso assumir o canal de warnings antes
+// do import dinâmico (módulos nativos com import estático são avaliados antes da execução do corpo do
+// módulo; ouvir depois já seria tarde demais).
 process.removeAllListeners("warning");
 process.on("warning", () => {});
 
@@ -22,20 +25,21 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-// 跨平台默认路径(macOS/Linux: ~/.zcode/...;Windows: %USERPROFILE%\.zcode\...),可用 ZCODE_USAGE_DB 覆盖
+// Caminho padrão multiplataforma (macOS/Linux: ~/.zcode/...; Windows: %USERPROFILE%\.zcode\...), pode ser sobrescrito por ZCODE_USAGE_DB
 const DB_PATH =
   process.env.ZCODE_USAGE_DB ||
   path.join(os.homedir(), ".zcode", "cli", "db", "db.sqlite");
-const N = Number(process.env.TOKEN_RATE_WINDOW) || 5;           // 统计窗口(均/峰)
-const HIST = Number(process.env.TOKEN_RATE_HIST) || 60;         // 曲线历史点数
-const MIN_GEN_MS = Number(process.env.TOKEN_RATE_MIN_MS) || 200;      // 有效样本:最短生成耗时
-const MAX_GEN_MS = Number(process.env.TOKEN_RATE_MAX_MS) || 3_600_000; // 有效样本:最长生成耗时(1h)
+const N = Number(process.env.TOKEN_RATE_WINDOW) || 5;           // janela estatística (média/pico)
+const HIST = Number(process.env.TOKEN_RATE_HIST) || 60;         // pontos de histórico do gráfico
+const MIN_GEN_MS = Number(process.env.TOKEN_RATE_MIN_MS) || 200;      // amostra válida: tempo mínimo de geração
+const MAX_GEN_MS = Number(process.env.TOKEN_RATE_MAX_MS) || 3_600_000; // amostra válida: tempo máximo de geração (1h)
 
-// 钩子状态文件:记录"用户最后所处的会话"与最近提问时刻(--current 守卫依赖 ts)
+// Arquivo de estado do hook: registra a "sessão em que o usuário esteve por último" e o momento da pergunta
+// mais recente (a guarda --current depende de ts)
 const STATE_FILE =
   process.env.TPS_MONITOR_STATE_FILE ||
   path.join(os.homedir(), ".zcode", "tps-monitor.last-session.json");
-const STATE_TTL_MS = 7 * 24 * 3600 * 1000; // 过旧的状态文件视为失效(与大屏跟随逻辑一致)
+const STATE_TTL_MS = 7 * 24 * 3600 * 1000; // arquivos de estado velhos demais são considerados inválidos (mesma lógica de seguimento do painel)
 
 function readState() {
   try {
@@ -51,8 +55,9 @@ function openDb() {
   return new DatabaseSync(DB_PATH, { readOnly: true });
 }
 
-// 未显式指定会话时的解析顺序:状态文件里"用户最后所处的会话"(切会话即跟随)→
-// 全局最近一次完成请求所属的会话
+// Ordem de resolução quando a sessão não é informada explicitamente: a "sessão em que o usuário esteve
+// por último" no arquivo de estado (acompanha a troca de sessão) → a sessão da requisição concluída mais
+// recente em todo o banco
 function fallbackSessionId(db) {
   const st = readState();
   if (st && st.sessionId) return st.sessionId;
@@ -67,10 +72,12 @@ function resolveSession(db, sessionId) {
   return { sid, scoped: sessionId ? "explicit" : "auto" };
 }
 
-// 主对话优先的过滤范围:有 main_turn 数据时只统计 main_turn,否则回退为全部请求
+// Escopo de filtragem com prioridade para a conversa principal: quando há dados de main_turn, conta
+// apenas main_turn; caso contrário, volta para todas as requisições
 function scopeFor(db, sid) {
-  // turn_id 仅在列存在时投影:旧版客户端的库没有该列,SELECT 引用会整句失败;
-  // 会话累计的 COUNT(DISTINCT turn_id) 依赖该投影
+  // turn_id só é projetado quando a coluna existe: bancos de clientes antigos não a têm e uma referência
+  // no SELECT quebraria a consulta inteira; o COUNT(DISTINCT turn_id) do acumulado da sessão depende
+  // dessa projeção
   let turnCol = "";
   try {
     const cols = db.prepare("PRAGMA table_info(model_usage)").all();
@@ -93,10 +100,10 @@ function scopeFor(db, sid) {
 function toItem(r) {
   const tok = r.output_tokens ?? 0;
   const reasoning = r.reasoning_tokens ?? 0;
-  // 部分行(如非流式/中断请求)缺 first_token_at,须判无效
+  // Algumas linhas (como requisições não-streaming ou interrompidas) não têm first_token_at e devem ser consideradas inválidas
   const hasTime = Number.isFinite(r.first_token_at) && Number.isFinite(r.completed_at) && r.completed_at > r.first_token_at;
-  const genMs = hasTime ? r.completed_at - r.first_token_at : null; // 纯生成耗时(不含首 token 等待)
-  // 速率分子含思考 token:思考内容同样是流式输出,ZCode 未单独记录时该列为 0,行为不变
+  const genMs = hasTime ? r.completed_at - r.first_token_at : null; // tempo de geração puro (sem a espera pelo primeiro token)
+  // O numerador da taxa inclui os tokens de raciocínio: o conteúdo de raciocínio também é gerado em streaming; quando o ZCode não o registra em coluna separada, esse campo fica 0 e o comportamento não muda
   const rateTokens = tok + reasoning;
   const valid = genMs != null && genMs >= MIN_GEN_MS && genMs < MAX_GEN_MS && rateTokens > 0;
   return {
@@ -112,7 +119,7 @@ function toItem(r) {
   };
 }
 
-// 会话累计用独立 SUM(不受展示窗口限制);速率均值/峰值由调用方按窗口传入
+// O acumulado da sessão usa um SUM independente (não limitado pela janela de exibição); a média/pico da taxa é passada pelo chamador de acordo com a janela
 function sessionAggregate(db, scopeSql, args, rated) {
   if (!rated.length) return null;
   const sumRow = db
@@ -124,7 +131,7 @@ function sessionAggregate(db, scopeSql, args, rated) {
       " FROM (" + scopeSql + ")"
     )
     .get(...args);
-  // 会话轮次数:COUNT(DISTINCT turn_id);旧库无 turn_id 列时退回请求数
+  // Número de turnos da sessão: COUNT(DISTINCT turn_id); em bancos antigos sem a coluna turn_id, recua para o número de requisições
   let turns = sumRow.n ?? 0;
   try {
     const trow = db.prepare("SELECT COUNT(DISTINCT turn_id) t FROM (" + scopeSql + ")").get(...args);
@@ -154,11 +161,11 @@ function query(sessionId) {
   try {
     const { sid, scoped } = resolveSession(db, sessionId);
     const { scopeSql, args } = scopeFor(db, sid);
-    // 曲线历史(大窗口)与统计(小窗口)分别查询,刷新/重开不丢
+    // O histórico do gráfico (janela grande) e as estatísticas (janela pequena) são consultados separadamente, para não perder dados ao atualizar/reabrir
     const histRows = db.prepare(scopeSql + " ORDER BY completed_at DESC LIMIT ?").all(...args, HIST);
     const items = histRows.slice(0, N).map(toItem);
     const rated = items.filter((i) => i.tokPerSec != null);
-    // 展示用 latest 优先取最近一条"有效"记录,避免在途/缺字段行顶掉头条
+    // Para exibição, o latest prioriza o registro "válido" mais recente, evitando que linhas em andamento/sem campos desbancem o destaque
     const latest = rated[0] ?? items[0] ?? null;
     const session = sessionAggregate(db, scopeSql, args, rated);
     return { sessionId: sid, scoped, latest, session, history: items.slice().reverse() };
@@ -167,10 +174,11 @@ function query(sessionId) {
   }
 }
 
-// 本轮 = 会话里最新的 turn_id(一次用户消息触发的全部请求共享同一个 turn_id,
-// 含"模型→工具→模型"的每一段)。回复收尾时(模型运行 --turn --current)本轮已完成
-// 的各段均已实时入库,因此能给出真正的"本问即时速率";而 prompt-submit 时刻本问
-// 尚未发生,只能看到上一轮。
+// Este turno = o turn_id mais recente da sessão (todas as requisições disparadas por uma mensagem do
+// usuário compartilham o mesmo turn_id, incluindo cada trecho "modelo→ferramenta→modelo"). Ao final da
+// resposta (quando o modelo roda --turn --current), todos os trechos concluídos deste turno já foram
+// gravados em tempo real, permitindo uma verdadeira "taxa instantânea desta pergunta"; no momento do
+// prompt-submit esta pergunta ainda não ocorreu, então só é possível ver o turno anterior.
 function latestTurnId(db, sid) {
   try {
     const row = db
@@ -178,13 +186,14 @@ function latestTurnId(db, sid) {
       .get(sid);
     return row ? row.turn_id : null;
   } catch {
-    return null; // 旧版客户端的库没有 turn_id 列
+    return null; // bancos de clientes antigos não têm a coluna turn_id
   }
 }
 
-// 最近一次用户提问的时间戳(prompt-submit/session-start 钩子写入 promptTs;Stop 钩子
-// 会更新 ts 但保留 promptTs);--current 守卫用:最新 turn 的所有行都早于提问时刻,
-// 说明本问尚未产生任何模型请求(纯问答轮),不得当作"本问"统计。
+// Timestamp da última pergunta do usuário (os hooks prompt-submit/session-start gravam promptTs; o hook
+// Stop atualiza ts, mas preserva promptTs); usado pela guarda --current: se todas as linhas do turno mais
+// recente forem anteriores ao momento da pergunta, significa que esta pergunta ainda não gerou nenhuma
+// requisição de modelo (turno só de perguntas e respostas) e não deve ser contabilizada como "esta pergunta".
 function lastPromptTs() {
   const st = readState();
   const ts = st ? (Number.isFinite(st.promptTs) ? st.promptTs : st.ts) : null;
@@ -208,8 +217,9 @@ function queryTurn(sessionId, opts = {}) {
       return { sessionId: sid, turnId: null, turn: null, session };
     }
     if (!turnRows.length) return { sessionId: sid, turnId, turn: null, session };
-    // --current 守卫:最新 turn 的行全部早于本次提问时刻 → 本问还没有任何模型请求
-    // (典型场景:纯问答轮在回答结束前),绝不把上一轮数据冒充"本问"返回。
+    // Guarda --current: se todas as linhas do turno mais recente forem anteriores ao momento desta pergunta
+    // → esta pergunta ainda não tem nenhuma requisição de modelo (cenário típico: turno só de perguntas antes
+    // de a resposta terminar); nunca devolve os dados do turno anterior fingindo ser "esta pergunta".
     if (opts.current) {
       const ts = lastPromptTs();
       const lastAt = Math.max(...turnRows.map((r) => r.completed_at ?? 0));
@@ -224,13 +234,13 @@ function queryTurn(sessionId, opts = {}) {
     const turn = {
       requests: items.length,
       rated: rated.length,
-      ttftMs: items[0].ttftMs, // 本轮第一段的首字延迟
+      ttftMs: items[0].ttftMs, // tempo até o primeiro token do primeiro trecho deste turno
       firstAt: items[0].completedAt,
       lastAt: items[items.length - 1].completedAt,
       genMs,
       totalOutput: items.reduce((s, i) => s + i.outputTokens, 0),
       totalReasoning: items.reduce((s, i) => s + i.reasoningTokens, 0),
-      // 本轮即时速率:总产出 / 总纯生成时长(按段加权,排除段间工具等待),单段时即该段速率
+      // Taxa instantânea deste turno: produção total / tempo total de geração puro (ponderado por trecho, excluindo a espera por ferramentas entre trechos); com um único trecho, é a taxa desse trecho
       tokPerSec: genMs >= MIN_GEN_MS && totalTok > 0 ? Math.round((totalTok / genMs) * 10000) / 10 : null,
       peak: rated.length ? Math.max(...rated.map((i) => i.tokPerSec)) : null,
     };
@@ -240,7 +250,7 @@ function queryTurn(sessionId, opts = {}) {
   }
 }
 
-// 紧凑单位(注入行等需一眼扫读处):千以下原始、千~万一位小数 k、万~百万取整 k、百万以上一位小数 M
+// Unidade compacta (para linhas injetadas e outros lugares de leitura rápida): abaixo de mil, cru; de mil a dez mil, um decimal com k; de dez mil a um milhão, k arredondado; acima de um milhão, um decimal com M
 function fmtCompact(n) {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
   if (n >= 10_000) return Math.round(n / 1000) + "k";
@@ -248,7 +258,7 @@ function fmtCompact(n) {
   return String(n);
 }
 
-// 千分位精确数字(每轮输出与 CLI 明细):2,762
+// Números exatos com separador de milhar (saída por turno e detalhes da CLI): 2,762
 function fmtNum(n) {
   return n.toLocaleString("en-US");
 }
@@ -258,7 +268,7 @@ function formatLine(r) {
   if (!l) return "sem requisicoes concluidas";
   const t = new Date(l.completedAt).toLocaleTimeString("pt-BR", { hour12: false });
   const parts = [
-    // 采样发生在发送消息的瞬间,头条描述的是上一条已完成回复
+    // A amostragem acontece no instante em que a mensagem é enviada; o destaque descreve a última resposta concluída
     `⚡ ${l.tokPerSec ?? "-"} tok/s (turno anterior)`,
     `TTFT ${l.ttftMs != null ? (l.ttftMs / 1000).toFixed(1) : "-"}s`,
     `saida ${fmtNum(l.outputTokens)}${l.reasoningTokens ? `(+${fmtNum(l.reasoningTokens)} raciocinio)` : ""} tok / geracao ${l.genMs != null ? (l.genMs / 1000).toFixed(1) : "-"}s`,
@@ -271,13 +281,13 @@ function formatLine(r) {
   return parts.join(" · ");
 }
 
-// 本问统计行(回复收尾自测、Stop 钩子、监控大屏共用)
+// Linha de estatística desta pergunta (autoteste ao final da resposta, hook Stop e painel de monitoramento)
 function formatTurnLine(r) {
   const t = r.turn;
   if (!t) return "sem dados deste turno";
   const time = new Date(t.lastAt).toLocaleTimeString("pt-BR", { hour12: false });
   const parts = [
-    // 采样发生在回复刚结束的瞬间,头条即本轮即时速率
+    // A amostragem acontece no instante logo após o fim da resposta; o destaque é a taxa instantânea deste turno
     `⚡ ${t.tokPerSec ?? "-"} tok/s (este turno)`,
     `TTFT ${t.ttftMs != null ? (t.ttftMs / 1000).toFixed(1) : "-"}s`,
     `saida ${fmtNum(t.totalOutput)}${t.totalReasoning ? `(+${fmtNum(t.totalReasoning)} raciocinio)` : ""} tok / geracao ${t.genMs > 0 ? (t.genMs / 1000).toFixed(1) : "-"}s`,
@@ -298,7 +308,7 @@ if (process.argv[1] && process.argv[1].endsWith("token-rate.mjs")) {
     const r = queryTurn(sid, { current });
     if (json) console.log(JSON.stringify(r, null, 2));
     else if (r.turn) console.log(formatTurnLine(r));
-    // --current 且本问尚无数据:不输出任何行,调用方据此不显示统计(绝不回退到上一轮)
+    // Com --current e ainda sem dados desta pergunta: não imprime nenhuma linha, e o chamador não exibe estatística (nunca recorre ao turno anterior)
   } else {
     const r = query(sid);
     if (json) {
@@ -307,7 +317,7 @@ if (process.argv[1] && process.argv[1].endsWith("token-rate.mjs")) {
       const s = r.session;
       console.log(formatLine(r));
       if (s) {
-        // CLI 明细面向细读,全部千分位精确数字
+        // O detalhe da CLI é para leitura minuciosa; todos os números com separador de milhar
         console.log(`sessao: saida ${fmtNum(s.totalOutput)}${s.totalReasoning ? `(+${fmtNum(s.totalReasoning)} raciocinio)` : ""} tok · entrada ${fmtNum(s.totalInput)} tok (cache ${fmtNum(s.totalCacheRead)}) · ${s.requests} req`);
       }
     }

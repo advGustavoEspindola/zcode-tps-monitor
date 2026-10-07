@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-// zcode-tps-monitor 的 stdio MCP server。协议实现沿用官方 example-plugin 的
-// Content-Length 帧 + 换行 JSON 兼容写法,业务逻辑复用 scripts/lib/collect-core.mjs。
+// Servidor MCP stdio do zcode-tps-monitor. A implementação do protocolo segue a compatibilidade
+// do example-plugin oficial com frames Content-Length + JSON por linha; a lógica de negócio
+// reutiliza scripts/lib/collect-core.mjs.
 //
-// 手工冒烟测试:
+// Teste de fumaça manual:
 //   printf '%s\n' \
 //     '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"manual","version":"0"}}}' \
 //     '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
@@ -13,7 +14,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { snapshot, watch, formatSnapshot, formatWatch } from "../scripts/lib/collect-core.mjs";
 
-// 版本号自动跟随插件清单,避免与插件版本脱节
+// O número de versão segue automaticamente o manifesto do plugin, para não divergir da versão do plugin
 const PLUGIN_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 let VERSION = "0.0.0";
 try {
@@ -25,17 +26,17 @@ const TOOLS = [
   {
     name: "tps_snapshot",
     description:
-      "获取一次 TPS 吞吐快照:当前 TPS、延迟 p50/p95/p99、错误率,以及本机 CPU/内存使用。无需参数。",
+      "Obtém um snapshot de vazão de TPS: TPS atual, latências p50/p95/p99, taxa de erros e uso de CPU/memória locais. Não requer parâmetros.",
     inputSchema: { type: "object", properties: {} },
   },
   {
     name: "tps_watch",
     description:
-      "按秒采样观察 TPS 一段时间,返回平均/最小/最大与延迟、错误率统计。seconds: 2-30,默认 5。",
+      "Observa o TPS por um período, amostrando a cada segundo, e retorna estatísticas de média/mínimo/máximo, latência e taxa de erros. seconds: 2-30, padrão 5.",
     inputSchema: {
       type: "object",
       properties: {
-        seconds: { type: "integer", minimum: 2, maximum: 30, description: "采样秒数" },
+        seconds: { type: "integer", minimum: 2, maximum: 30, description: "Segundos de amostragem" },
       },
     },
   },
@@ -43,7 +44,7 @@ const TOOLS = [
 
 function writeMessage(message) {
   const body = JSON.stringify(message);
-  // MCP stdio 帧:Content-Length 头 + 体(同时兼容简单客户端的裸 JSON 行)
+  // Frame MCP stdio: cabeçalho Content-Length + corpo (também compatível com linhas JSON simples de clientes básicos)
   const payload = `Content-Length: ${Buffer.byteLength(body, "utf8")}\r\n\r\n${body}`;
   process.stdout.write(payload);
 }
@@ -56,7 +57,7 @@ async function handleRequest(msg) {
   const { id, method, params } = msg;
 
   if (id === undefined || id === null) {
-    return; // 通知(如 initialized)直接忽略
+    return; // notificações (ex.: initialized) são ignoradas
   }
 
   switch (method) {
@@ -85,18 +86,18 @@ async function handleRequest(msg) {
           const w = await watch(sec);
           ok(id, { content: [{ type: "text", text: formatWatch(w) }], isError: false });
         } else {
-          fail(id, -32601, `Unknown tool: ${name}`);
+          fail(id, -32601, `Ferramenta desconhecida: ${name}`);
         }
       } catch (err) {
         ok(id, {
-          content: [{ type: "text", text: `[zcode-tps-monitor] 采集失败: ${err.message}` }],
+          content: [{ type: "text", text: `[zcode-tps-monitor] falha na coleta: ${err.message}` }],
           isError: true,
         });
       }
       return;
     }
     default:
-      fail(id, -32601, `Method not found: ${method}`);
+      fail(id, -32601, `Método não encontrado: ${method}`);
   }
 }
 
@@ -149,4 +150,4 @@ process.stdin.on("end", () => {
   if (buffer.length) handleRaw(buffer.toString("utf8"));
 });
 
-process.stderr.write("[zcode-tps-monitor] stdio MCP server ready\n");
+process.stderr.write("[zcode-tps-monitor] servidor MCP stdio pronto\n");

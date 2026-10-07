@@ -1,121 +1,133 @@
 # Changelog
 
+## 0.8.7 — 2026-10-07
+
+### Tradução completa para português (pt-BR)
+- **Documentação inteira em pt-BR**: README raiz, README do plugin, CHANGELOG (todas as seções históricas), SKILL.md e os três comandos (`/tps`, `/tps-doctor`, `/dashboard`) traduzidos por completo. As marcações citadas nos documentos passam a referir exatamente os literais emitidos pelos hooks: `[estatistica deste turno]` e `[contexto interno · nao mostrar]`.
+- **Código comentado em pt-BR**: comentários de hooks, scripts, painel, servidor MCP, gerador de ícone e testes.
+- **Saídas de usuário em pt-BR**: relatório do `/tps-doctor` e da coleta (`scripts/collect.mjs`, `scripts/lib/collect-core.mjs`), rótulos do painel web (`dashboard/index.html`) e as descrições das ferramentas MCP (`tps_snapshot`/`tps_watch` — nomes das ferramentas mantidos).
+- **Manifestos e catálogo em pt-BR**: descrições de `.zcode-plugin/plugin.json` e `.claude-plugin/plugin.json`, `userConfig`, `marketplace.json` e o campo `description` de `hooks.json`; keywords traduzidas para o português.
+- **LICENSE**: o texto oficial do MIT permanece em inglês (instrumento legal); foi acrescentada ao arquivo uma tradução de referência em pt-BR, marcada como não oficial.
+
+### Mantido inalterado
+- Identificadores de código, nomes de colunas SQL (`turn_id`, `promptTs`, `main_turn`), flags de CLI, chaves de configuração (`tokenRateLine`, `stopHookLine`, `metrics_url`), nomes de eventos de hook e as strings de saída da linha de taxa (assertadas byte a byte pelos testes). Testes seguem 14/14 verdes.
+
 ## 0.8.6 — 2026-10-07
 
-### 合并:pt-BR 运行时线(本地曾以 0.8.3 名义安装)并入主线
-用户侧实际在用的是一条基于 0.8.2 的本地改进线(界面文案全部 pt-BR、桌面 tok/s 条重写、会话自举 UI、会话统计增强),版本号曾局部标为 0.8.3——与本仓库 0.8.3 是不同内容。本版把该线并入 0.8.5 主线,双方改动全部保留,无回退。
+### Fusão: linha de runtime pt-BR (instalada localmente como 0.8.3) incorporada à linha principal
+O que estava realmente em uso do lado do usuário era uma linha local de melhorias baseada em 0.8.2 (textos de interface todos em pt-BR, reescrita da barra de tok/s na área de trabalho, autossuficiência de UI da sessão, estatísticas de sessão aprimoradas), cujo número de versão foi localmente marcado como 0.8.3 — conteúdo diferente do 0.8.3 deste repositório. Esta versão incorpora essa linha à linha principal 0.8.5, mantendo todas as alterações de ambos os lados, sem reverter nada.
 
-### 新增
-- **pt-BR 运行时文案**:SessionStart 提示、UserPromptSubmit【本问统计指令】、hooks 状态文案、速率行输出(`token-rate.mjs` 的 formatLine/formatTurnLine/CLI 明细)全部改为葡萄牙语(pt-BR);指令保留 0.8.4 的防折叠严格顺序与降级规则、0.8.5 的 `promptTs` 守卫语义,注入的上一轮行改挂 `[contexto interno · nao mostrar]` 前缀。
-- **桌面 tok/s 条重写(`dashboard/overlay.ps1`,estilo DSH)**:改为贴在 ZCode composer 底部的 StatsLine(灰字、无背景、单实例互斥、跟随主窗口),替换原透明悬浮条(仅 Windows)。
-- **`hooks/ensure-ui.mjs` 会话自举**:SessionStart 后台拉起大屏 `:7423` 与桌面 tok/s 条(缺失才启动,失败静默,不阻塞钩子)。
-- **会话统计增强字段**:`turns`(COUNT DISTINCT turn_id)、`avgTtftMs`、`totalGenMs`、`tokPerSec`(总产出/总生成时长,与本轮口径一致);旧库无 `turn_id` 列时按列探测优雅降级(PRAGMA 探测投影,不再整句失败)。
+### Adicionado
+- **Textos de runtime em pt-BR**: o aviso do SessionStart, a UserPromptSubmit [instrução de estatísticas da pergunta atual], os textos de status dos hooks e a saída da linha de taxa (formatLine/formatTurnLine/detalhes do CLI de `token-rate.mjs`) foram todos alterados para português (pt-BR); a instrução mantém a ordem estrita anticollapse e as regras de degradação da 0.8.4, e a semântica da proteção `promptTs` da 0.8.5; a linha injetada do turno anterior passou a usar o prefixo `[contexto interno · nao mostrar]`.
+- **Reescrita da barra de tok/s na área de trabalho (`dashboard/overlay.ps1`, estilo DSH)**: passou a ser uma StatsLine colada na parte inferior do composer do ZCode (texto cinza, sem fundo, instância única com mutex, segue a janela principal), substituindo a antiga barra flutuante transparente (apenas Windows).
+- **Autossuficiência de sessão em `hooks/ensure-ui.mjs`**: após o SessionStart, sobe em segundo plano o painel em `:7423` e a barra de tok/s na área de trabalho (inicia apenas se ausente; em caso de falha, silencia e não bloqueia o hook).
+- **Campos aprimorados de estatísticas da sessão**: `turns` (COUNT DISTINCT turn_id), `avgTtftMs`, `totalGenMs`, `tokPerSec` (produção total / tempo total de geração, consistente com o critério deste turno); em bancos antigos sem `turn_id`, degradação elegante por detecção de coluna (projeção de detecção via PRAGMA, sem mais falhar a consulta inteira).
 
-### 变更
-- 速率行标签(现行输出格式):`⚡ … tok/s (este turno)` / `(turno anterior)`、`TTFT …s`、`saida … tok / geracao …s`、`N etapas / pico …`、`acumulado … tok`、`med. N avg / pico max`;README 指标表示例行同步。
-- `.zcode-plugin/plugin.json` 显式声明 `hooks` / `mcpServers`;`userConfig.metrics_url` 增加 `default: ""`。
-- 测试:行文案断言随 pt-BR 更新,新增 `turns` / `avgTtftMs` 断言;14 项全绿(`node --test test/token-rate.test.mjs`)。
-- 备注:效果截图(`docs/effect-token-rate.png`)仍是中文标签时期生成的,仅示意;文字标签以本文与 README 指标表为准。
+### Alterado
+- Rótulos da linha de taxa (formato de saída atual): `⚡ … tok/s (este turno)` / `(turno anterior)`, `TTFT …s`, `saida … tok / geracao …s`, `N etapas / pico …`, `acumulado … tok`, `med. N avg / pico max`; a tabela de métricas do README foi sincronizada em conformidade.
+- `.zcode-plugin/plugin.json` declara explicitamente `hooks` / `mcpServers`; `userConfig.metrics_url` ganhou `default: ""`.
+- Testes: as asserções de texto da linha foram atualizadas para pt-BR, com novas asserções de `turns` / `avgTtftMs`; 14 testes todos verdes (`node --test test/token-rate.test.mjs`).
+- Observação: a captura de efeito (`docs/effect-token-rate.png`) ainda foi gerada na época dos rótulos em chinês, servindo apenas como ilustração; os rótulos de texto válidos são os deste documento e da tabela de métricas do README.
 
 ## 0.8.5 — 2026-10-04
 
-### 修复:Stop 钩子触发导致「本问统计」消失
-- **实测发现**:客户端已开始触发 Stop 事件(此前版本从不触发),且**时机不定**——曾观察到在用户轮次进行中触发。旧 stop.mjs 每次触发都把状态文件的时间戳改写为当前时刻,`--current` 守卫据此误判"本问数据全部早于提问时刻",统计行凭空消失(本日在真实会话中复现并定位)。
-- **promptTs 字段**:prompt-submit / session-start 钩子写入 `promptTs`(提问时刻);Stop 钩子更新 `ts` 时**保留 promptTs**;守卫只认 `promptTs`。任何一方覆盖状态文件都不再影响守卫判定。
-- **Stop 直显改为默认关闭(实验性可选)**:因触发时机不定,直显可能过早或重复;`{"stopHookLine": true}` 可开启,并按 turnId 去重、每轮最多显示一次。0.8.3 曾把该键标记废弃,现重新定义为实验开关。
-- 新增回归测试:状态文件被 Stop 更新后守卫仍以 promptTs 为准。
-- doctor / READMEs 同步新语义。
+### Correção: o disparo do hook Stop fazia a "estatística da pergunta atual" desaparecer
+- **Descoberta em teste real**: o cliente passou a disparar o evento Stop (versões anteriores nunca disparavam), e **o momento é variável** — já se observou o disparo durante um turno do usuário. O antigo stop.mjs reescrevia, a cada disparo, o carimbo de data/hora do arquivo de estado com o momento atual; a proteção `--current` concluía erradamente que "todos os dados da pergunta atual são anteriores ao momento da pergunta", e a linha de estatísticas desaparecia do nada (reproduzido e localizado hoje em uma sessão real).
+- **Campo promptTs**: os hooks prompt-submit / session-start gravam `promptTs` (momento da pergunta); ao atualizar `ts`, o hook Stop **preserva promptTs**; a proteção considera apenas `promptTs`. Independentemente de quem sobrescreva o arquivo de estado, a decisão da proteção não é mais afetada.
+- **A exibição direta do Stop passou a ser desativada por padrão (opcional, experimental)**: como o momento do disparo é variável, a exibição direta pode ser cedo demais ou se repetir; `{"stopHookLine": true}` pode ativá-la, com deduplicação por turnId e no máximo uma exibição por turno. A 0.8.3 chegou a marcar essa chave como obsoleta; agora ela foi redefinida como um interruptor experimental.
+- Novo teste de regressão: após o arquivo de estado ser atualizado pelo Stop, a proteção ainda se baseia em promptTs.
+- doctor / READMEs sincronizados com a nova semântica.
 
 ## 0.8.4 — 2026-09-25
 
-### 修复:回答正文被折叠、只剩一行统计
-- **现象**:开启插件后,不少回答的正文被客户端收进折叠区,可见的只剩最后一行 `> ⚡ … tok/s(本轮)`。
-- **根因**(会话数据库 + 客户端代码双重定位):客户端把带工具调用的消息折叠进「模型轨迹」区,仅轮次最后一条纯文字消息默认展开。旧指令只说"在输出最终总结之前运行脚本",但模型常执行成"先写完正文 → 再补跑统计脚本 → 单独发一条统计行"——正文被降级进折叠区,孤零零的统计行成了唯一可见内容。
-- **指令改为防折叠的严格顺序**:①先运行脚本,②再输出完整回复正文,统计行附在该条回复末尾;明确禁止统计行单独成条、禁止正文写完后再调用任何工具,并说明原因。
-- **降级规则**:已写完正文才发现没跑脚本 → 直接省略统计行结束回答,绝不事后补调用工具。
-- SessionStart 提示语与 SKILL.md 展示规范同步该规则。
+### Correção: o corpo da resposta era recolhido, sobrando apenas uma linha de estatísticas
+- **Sintoma**: após ativar o plugin, o corpo de muitas respostas era recolhido pelo cliente para uma área oculta, e a única coisa visível era a última linha `> ⚡ … tok/s(este turno)`.
+- **Causa raiz** (localizada tanto no banco de dados da sessão quanto no código do cliente): o cliente recolhia mensagens com chamadas de ferramentas para a área de "trajetória do modelo", deixando expandida por padrão apenas a última mensagem de texto puro do turno. A antiga instrução dizia apenas "execute o script antes de emitir o resumo final", mas o modelo frequentemente executava como "escrever o corpo → depois rodar o script de estatísticas → enviar uma linha de estatísticas separada" — o corpo era rebaixado para a área recolhida, e a linha de estatísticas solitária virava o único conteúdo visível.
+- **A instrução passou a ser uma ordem estrita anticollapse**: ① primeiro execute o script, ② depois emita o corpo completo da resposta, com a linha de estatísticas anexada no fim dessa mesma resposta; é proibido explicitamente enviar a linha de estatísticas como mensagem separada e chamar qualquer ferramenta depois de escrever o corpo, com a explicação do motivo.
+- **Regra de degradação**: percebeu que não rodou o script depois de já ter escrito o corpo → simplesmente omita a linha de estatísticas e encerre a resposta, nunca chame ferramentas retroativamente.
+- O aviso do SessionStart e as normas de exibição do SKILL.md foram sincronizados com essa regra.
 
-### 其他
-- 补齐缺失的版本 tag(v0.6.0、v0.6.1、v0.8.0~v0.8.4),tag 与插件版本号一一对应。
+### Outros
+- Completadas as tags de versão ausentes (v0.6.0, v0.6.1, v0.8.0~v0.8.4), com correspondência um-a-um entre tags e números de versão do plugin.
 
 ## 0.8.3 — 2026-09-25
 
-### 修复:全部文档与指令对齐「收尾自测」机制(0.8.2 遗留的口径分裂)
-- **SessionStart 欢迎语重写**:旧文案宣称「本轮速率由 Stop 钩子自动显示,无需转发」——当前客户端版本不触发 Stop 钩子,该表述会在每个会话开始时误导模型收尾时什么都不做。新文案与 prompt-submit 的「本问统计指令」完全一致。
-- **SKILL.md 展示规范修正**:删除「原样附上注入的 📊 指标行」旧要求(正是它曾让模型把「(上轮)」行贴到回复里),改为按【本轮统计指令】收尾自测、【内部背景】行绝不展示。
-- **两份 README、插件清单描述重写**:工作原理流程图、效果预览、功能特性、使用表与 FAQ 全部改为真实机制;Stop 钩子明确标注「兼容保留,当前客户端不触发」。效果截图按现行输出格式重新生成。
+### Correção: todos os documentos e instruções alinhados ao mecanismo de "autoteste no fim" (divergência de critério herdada da 0.8.2)
+- **Mensagem de boas-vindas do SessionStart reescrita**: o texto antigo afirmava que "a taxa do turno é exibida automaticamente pelo hook Stop, sem necessidade de repasse" — a versão atual do cliente não dispara o hook Stop, e essa afirmação enganava o modelo, que não fazia nada ao final em cada início de sessão. O novo texto é totalmente consistente com a "instrução de estatísticas da pergunta atual" do prompt-submit.
+- **Correção das normas de exibição do SKILL.md**: removido o requisito antigo de "anexar a linha de métricas 📊 injetada como está" (que fazia o modelo colar a linha "(turno anterior)" na resposta), substituído por autoteste no fim conforme a [instrução de estatísticas do turno], e a linha [contexto interno] nunca é exibida.
+- **Os dois READMEs e a descrição do manifesto do plugin reescritos**: o fluxograma de como funciona, a prévia do efeito, os recursos, a tabela de uso e o FAQ foram todos ajustados ao mecanismo real; o hook Stop é claramente marcado como "mantido por compatibilidade, não disparado pelo cliente atual". A captura de efeito foi regerada no formato de saída atual.
 
-### 新增
-- **监控大屏「最新一问(本问)」实时卡片**:usage 库按 turn 逐段实时入库,大屏秒级轮询,提问进行中即可看到本问速率、段数与输出量爬升(`/api/token-rate` 新增 `turn` 字段)。
-- 会话解析兜底:未显式指定会话时,优先使用状态文件里「用户最后所处的会话」(切会话即跟随),再退回全局最近完成请求;`TPS_MONITOR_STATE_FILE` 环境变量可覆盖状态文件路径(多实例/测试)。
-- `/tps-doctor` 新增检测:状态文件缺少提问时间戳时提示「--current 守卫不可用」;配置含已废弃的 `stopHookLine` 时提示可删除。
+### Adicionado
+- **Cartão em tempo real da "pergunta mais recente (atual)" no painel de monitoramento**: o banco usage grava cada etapa por turn em tempo real, o painel faz polling a cada segundo, e é possível ver a taxa, o número de etapas e o volume de saída da pergunta atual subindo enquanto a pergunta está em andamento (`/api/token-rate` ganhou o campo `turn`).
+- Fallback de resolução de sessão: quando a sessão não é especificada explicitamente, usa-se primeiro a "sessão em que o usuário estava por último" no arquivo de estado (acompanha ao trocar de sessão), recorrendo depois à solicitação concluída mais recente no geral; a variável de ambiente `TPS_MONITOR_STATE_FILE` pode sobrescrever o caminho do arquivo de estado (múltiplas instâncias/testes).
+- Novas verificações no `/tps-doctor`: quando ao arquivo de estado falta o carimbo de data/hora da pergunta, avisa que "a proteção `--current` não está disponível"; quando a configuração contém a obsoleta `stopHookLine`, sugere removê-la.
 
-### 变更
-- 注入的上一轮速率行加【内部背景·勿展示】前缀,从措辞上根除模型误展示的可能。
-- `stopHookLine` 配置键废弃(0.8.2 起已无实际作用),文档同步移除;`tokenRateLine` 仍是唯一总开关。
+### Alterado
+- A linha injetada da taxa do turno anterior ganhou o prefixo [contexto interno · não mostrar], eliminando pela própria redação a possibilidade de o modelo exibi-la por engano.
+- A chave de configuração `stopHookLine` foi descontinuada (sem efeito prático desde a 0.8.2) e removida da documentação; `tokenRateLine` continua sendo o único interruptor geral.
 
-### 测试
-- 补齐 `--current` 守卫(0.8.2 旗舰特性此前无测试):提问时刻晚于本问全部数据 → 不返回本问;本问已有数据 → 正常返回;无显式会话时优先状态文件。夹具时间戳改为真实纪元毫秒与守卫同量纲。
+### Testes
+- Completados os testes da proteção `--current` (o recurso carro-chefe da 0.8.2 não tinha testes): momento da pergunta posterior a todos os dados da pergunta atual → não retorna a pergunta atual; já havendo dados da pergunta atual → retorna normalmente; sem sessão explícita, prioriza o arquivo de estado. Os carimbos de data/hora dos fixtures foram alterados para milissegundos reais de época, na mesma dimensão da proteção.
 
 ## 0.8.2 — 2026-09-12
 
-### 修复:每条回复显示「本问」统计,不再出现「上轮」
-- **本问统计指令**:UserPromptSubmit 注入新增指令——模型在回答收尾时运行 `token-rate.mjs --turn --current`,把输出行原样引用在回复末尾。它统计的是**本次提问**从提出到最近一次工具调用的真实速率(usage 数据库按 turn 逐段实时入库)。
-- **--current 守卫**:最新 turn 的数据若全部早于本次提问时刻(纯问答轮尚无本问数据),脚本不输出任何统计行——**任何情况下都不把上一轮数据当作本问显示**,并明确禁止模型引用「(上轮)」上下文行。
-- 注入的「(上轮)」行降级为纯模型上下文并标注禁止引用。
-- 说明:统计覆盖到最近一次工具调用为止;最终总结文字在其后生成,不计入。纯问答(无工具调用)的回答没有可靠的「本问」数据,按守卫不显示统计行。
+### Correção: cada resposta exibe a estatística da "pergunta atual", sem mais "turno anterior"
+- **Instrução de estatísticas da pergunta atual**: a injeção do UserPromptSubmit ganhou uma nova instrução — o modelo executa `token-rate.mjs --turn --current` ao final da resposta e cita a linha de saída como está no fim da resposta. Ela calcula a taxa real **desta pergunta**, desde a sua formulação até a chamada de ferramenta mais recente (o banco usage grava cada etapa por turn em tempo real).
+- **Proteção `--current`**: se todos os dados do turn mais recente forem anteriores ao momento desta pergunta (turno de puro perguntas e respostas ainda sem dados da pergunta atual), o script não emite nenhuma linha de estatísticas — **em hipótese alguma exibe dados do turno anterior como se fossem da pergunta atual**, e proíbe explicitamente o modelo de citar a linha de contexto "(turno anterior)".
+- A linha injetada "(turno anterior)" foi rebaixada a contexto puro do modelo, marcada como proibida de citação.
+- Observação: a estatística cobre até a chamada de ferramenta mais recente; o texto do resumo final é gerado depois e não é contado. Respostas de puro perguntas e respostas (sem chamada de ferramentas) não têm dados confiáveis da "pergunta atual", e a proteção não exibe a linha de estatísticas.
 
 ## 0.8.1 — 2026-09-12
 
-### 新增
-- **插件图标**:新增 `assets/icon.png`(256×256 速度仪表盘 + 吞吐柱,`node assets/generate-icon.mjs` 可再生成),并在市场清单中为插件声明 `icon` 字段——客户端「发现 / 已安装」列表可显示插件图标。
-- 仓库 README 顶部展示图标。
+### Adicionado
+- **Ícone do plugin**: adicionado `assets/icon.png` (256×256, velocímetro + barra de vazão; pode ser regerado com `node assets/generate-icon.mjs`), e declarado o campo `icon` para o plugin no manifesto do marketplace — a lista "Descobrir / Instalados" do cliente passa a exibir o ícone do plugin.
+- O README do repositório exibe o ícone no topo.
 
 ## 0.8.0 — 2026-09-12
 
-### 新增
-- **本轮即时速率(Stop 钩子)**:新增 `hooks/stop.mjs` 并注册 `Stop` 事件。回复刚结束、本轮全部请求已入库的瞬间,按最新 `turn_id` 圈定本轮(含"模型→工具→模型"多段),以"总产出 / 总纯生成时长"计算加权即时速率,经 `systemMessage` 由客户端直接显示——不再依赖模型转发,消除"回复完成时统计的却是上一轮"的滞后。
-- `token-rate.mjs` 新增 `queryTurn` / `formatTurnLine` 与 `--turn` CLI;多段轮次显示「N 段 / 峰值」。
+### Adicionado
+- **Taxa instantânea do turno (hook Stop)**: adicionado `hooks/stop.mjs` e registrado o evento `Stop`. No instante em que a resposta termina e todas as solicitações do turno já foram gravadas, delimita-se o turno pelo `turn_id` mais recente (incluindo várias etapas "modelo→ferramenta→modelo"), calcula-se a taxa instantânea ponderada por "produção total / tempo total de geração pura", exibida diretamente pelo cliente via `systemMessage` — sem depender mais do repasse pelo modelo, eliminando o atraso de "estatística concluída na resposta, mas referente ao turno anterior".
+- `token-rate.mjs` ganhou `queryTurn` / `formatTurnLine` e a CLI `--turn`; turnos de várias etapas exibem "N etapas / pico".
 
-### 变更
-- `prompt-submit` 默认不再附加"回复末尾转发速率行"指令,注入的上一轮速率仅作模型上下文;新配置 `{"stopHookLine": false}` 可停用 Stop 行为、完整恢复 v0.7.x 模型转发旧行为。
-- SessionStart 提示语区分新旧两种展示模式。
+### Alterado
+- Por padrão, o `prompt-submit` não anexa mais a instrução de "repasse da linha de taxa no fim da resposta"; a taxa do turno anterior injetada serve apenas como contexto do modelo; a nova configuração `{"stopHookLine": false}` desativa o comportamento do Stop e restaura por completo o antigo comportamento de repasse pelo modelo da v0.7.x.
+- O aviso do SessionStart diferencia os dois modos de exibição, antigo e novo.
 
-### 兼容
-- 旧版客户端 usage 库无 `turn_id` 列时,本轮查询优雅降级(不抛错,退回单段口径)。
+### Compatibilidade
+- Quando o banco usage de clientes antigos não tem a coluna `turn_id`, a consulta do turno degrada elegantemente (sem lançar erro, recuando para o critério de etapa única).
 
 ## 0.7.1 — 2026-09-04
 
-### 变更
-- 数字显示规则化:每轮「输出」用千分位精确数字(`2,762 tok`);「累计」紧凑单位新增 M 档——千以下原始、1k~1万一位小数(`9.8k`)、1万~100万取整(`51k`)、≥100万一位小数(`73.8M`),修复百万级显示成 `73818k` 的问题。
-- CLI 明细行全部改为千分位精确数字(输出/输入/缓存读/请求次数)。
-- 监控大屏「上轮输出」卡片与悬浮信息同步千分位。
-- 新增 `fmtCompact` / `fmtNum` 换算单测(累计 7 项)。
+### Alterado
+- Regras de exibição de números padronizadas: em cada turno, "saída" usa número exato com separador de milhar (`2,762 tok`); a unidade compacta de "acumulado" ganhou a faixa M — abaixo de mil, valor bruto; de 1k a 10 mil, uma casa decimal (`9.8k`); de 10 mil a 1 milhão, arredondado (`51k`); ≥1 milhão, uma casa decimal (`73.8M`), corrigindo o problema de exibir números na casa dos milhões como `73818k`.
+- Todas as linhas de detalhe do CLI passaram a usar número exato com separador de milhar (saída/entrada/leitura de cache/número de solicitações).
+- O cartão "saída do turno anterior" e as informações flutuantes do painel de monitoramento sincronizados com o separador de milhar.
+- Novos testes unitários de conversão `fmtCompact` / `fmtNum` (7 no total).
 
 ## 0.7.0 — 2026-08-30
 
-### 修复
-- **严重**:prompt-submit 钩子把算好的速率行弄丢了(`line` 计算后未拼进 additionalContext),自 v0.6.1 起新安装的插件不会显示速率行。0.7.0 修复。
-- usage 数据库路径不再硬编码具体机器,按用户主目录解析(Windows/macOS/Linux),可用 `ZCODE_USAGE_DB` 覆盖。
+### Corrigido
+- **Grave**: o hook prompt-submit perdia a linha de taxa já calculada (`line` era calculada, mas não concatenada em additionalContext); plugins instalados desde a v0.6.1 não exibiam a linha de taxa. Corrigido na 0.7.0.
+- O caminho do banco usage não é mais fixado para uma máquina específica; é resolvido a partir do diretório inicial do usuário (Windows/macOS/Linux) e pode ser sobrescrito por `ZCODE_USAGE_DB`.
 
-### 变更
-- 速率分子纳入思考 token(`reasoning_tokens`;ZCode 未记录时为 0,行为不变)。注入行在存在思考 token 时显示「(+N 思考)」。
-- 速率行明确标注「(上轮)」——行在发送消息瞬间采样,描述的是上一条已完成回复。
-- 注入行新增「会话累计 N tok」;`token-rate.mjs` 人类可读模式追加输入/缓存读/请求数明细(累计用独立 SQL SUM,不受展示窗口限制)。
-- 有效样本判定可配置:`TOKEN_RATE_MIN_MS`(默认 200)、`TOKEN_RATE_MAX_MS`(默认 1 小时,原固定 10 分钟)。
+### Alterado
+- O numerador da taxa passou a incluir tokens de pensamento (`reasoning_tokens`; quando o ZCode não registra, é 0, e o comportamento não muda). A linha injetada exibe "(+N pensamento)" quando há tokens de pensamento.
+- A linha de taxa passou a ser explicitamente marcada como "(turno anterior)" — a linha é amostrada no instante do envio da mensagem e descreve a última resposta concluída.
+- A linha injetada ganhou "acumulado da sessão N tok"; o modo legível por humanos de `token-rate.mjs` passou a acrescentar detalhes de entrada/leitura de cache/número de solicitações (o acumulado usa um SUM SQL independente, sem limite de janela de exibição).
+- A validação de amostra útil passou a ser configurável: `TOKEN_RATE_MIN_MS` (padrão 200) e `TOKEN_RATE_MAX_MS` (padrão 1 hora, antes fixo em 10 minutos).
 
-### 新增
-- 自检命令 `/tps-doctor`(`scripts/doctor.mjs`):检查 Node 版本、usage 数据库与表结构、最近样本时间、会话状态文件、配置文件、大屏进程;支持 `--json`,失败时退出码为 1。
-- 注入开关:`~/.zcode/tps-monitor.config.json` 写入 `{"tokenRateLine": false}` 关闭每轮速率行注入。
-- 大屏生命周期:`--idle-exit`(默认 180 分钟)空闲自退;处理 SIGINT/SIGTERM;写 PID 文件(`~/.zcode/tps-monitor.dashboard.pid`)供 doctor 探测并给出停止命令。
-- 单元测试(`node --test`,临时库夹具)与 GitHub Actions CI(Node 22/24 × Ubuntu/Windows/macOS)。
-- MCP server 版本号自动读取 plugin.json,不再与插件版本脱节;本文件(CHANGELOG)。
+### Adicionado
+- Comando de autodiagnóstico `/tps-doctor` (`scripts/doctor.mjs`): verifica a versão do Node, o banco usage e a estrutura de tabelas, o horário da amostra mais recente, o arquivo de estado da sessão, o arquivo de configuração e o processo do painel; suporta `--json`, com código de saída 1 em caso de falha.
+- Interruptor de injeção: escreva `{"tokenRateLine": false}` em `~/.zcode/tps-monitor.config.json` para desativar a injeção da linha de taxa a cada turno.
+- Ciclo de vida do painel: saída automática por ociosidade com `--idle-exit` (padrão 180 minutos); trata SIGINT/SIGTERM; grava um arquivo de PID (`~/.zcode/tps-monitor.dashboard.pid`) para o doctor detectar e sugerir o comando de parada.
+- Testes unitários (`node --test`, com fixtures de banco temporário) e CI no GitHub Actions (Node 22/24 × Ubuntu/Windows/macOS).
+- O número de versão do servidor MCP é lido automaticamente do plugin.json, sem mais se desvincular da versão do plugin; este arquivo (CHANGELOG).
 
-### 清理
-- CLI 与钩子不再向 stderr 输出 `node:sqlite` 的 ExperimentalWarning 噪音。
+### Limpeza
+- O CLI e os hooks não emitem mais o ruído ExperimentalWarning do `node:sqlite` no stderr.
 
 ## 0.6.1 — 2026-08-30
-- 插件更名 tps-monitor → zcode-tps-monitor,明确 ZCode 专属定位;技能目录同步更名。
+- Plugin renomeado de tps-monitor → zcode-tps-monitor, deixando explícita a posição de exclusividade para ZCode; o diretório de skills renomeado em conformidade.
 
 ## 0.6.0 — 2026-08-30
-- 首个公开版本:每轮真实 token 速率注入、/tps 命令、MCP 工具、实时大屏、业务 TPS(demo/remote)。
+- Primeira versão pública: injeção da taxa real de tokens a cada turno, comando /tps, ferramentas MCP, painel em tempo real e TPS de negócio (demo/remote).

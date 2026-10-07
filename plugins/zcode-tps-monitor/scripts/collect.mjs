@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// CLI 采集入口:
-//   node collect.mjs             即时快照(人类可读)
-//   node collect.mjs --json      JSON 输出
-//   node collect.mjs --watch 5   采样 5 秒(2-60)
-// 环境变量 TPS_URL 指向返回 JSON 的指标接口;未设置时使用演示数据。
+// Ponto de entrada de coleta via CLI:
+//   node collect.mjs             instantâneo (legível por humanos)
+//   node collect.mjs --json      saída em JSON
+//   node collect.mjs --watch 5   amostra por 5 segundos (2-60)
+// A variável de ambiente TPS_URL aponta para uma interface de métricas que retorna JSON; se não definida, usa dados de demonstração.
 
 import { snapshot, watch, formatSnapshot, formatWatch } from "./lib/collect-core.mjs";
 
@@ -20,6 +20,6 @@ try {
     console.log(seconds ? formatWatch(data) : formatSnapshot(data));
   }
 } catch (err) {
-  console.error(`[zcode-tps-monitor] 采集失败: ${err.message}`);
+  console.error(`[zcode-tps-monitor] Falha na coleta: ${err.message}`);
   process.exit(1);
 }

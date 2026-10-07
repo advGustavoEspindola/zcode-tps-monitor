@@ -1,13 +1,16 @@
 #!/usr/bin/env node
-// Stop hook:客户端在回复流结束/中断时触发(2026-10 起实测会触发,且时机不定——
-// 曾观察到用户轮次进行中触发,而非仅在轮次结束时)。
-// 职责:
-// 1) 维护状态文件的 sessionId 跟随,但**绝不覆盖 promptTs**——那是「本问统计」
-//    --current 守卫的依据(0.8.4 及之前每次触发都会把提问时刻改写成当前时刻,
-//    导致守卫误判"本问无数据"、统计行消失)。
-// 2) 可选直显(实验):配置 {"stopHookLine": true} 时经 systemMessage 显示本轮统计,
-//    每个轮次最多显示一次。默认关闭——触发时机不定,避免过早/重复显示。
-// 输出严格 JSON;任何异常静默退出,不影响对话。
+// Hook Stop: disparado pelo cliente quando o fluxo de resposta termina/é interrompido (a partir de 2026-10
+// confirmou-se na prática que ele dispara, e em horário impreciso — já foi observado disparando durante o
+// turno do usuário, e não apenas ao final dele).
+// Responsabilidades:
+// 1) Mantém o sessionId do arquivo de estado em sincronia, mas **nunca sobrescreve o promptTs** — esse é o
+//    fundamento da guarda --current da "estatística desta pergunta" (na 0.8.4 e antes, cada disparo regravava
+//    o momento da pergunta com o momento atual, fazendo a guarda julgar erroneamente "sem dados para esta
+//    pergunta" e a linha de estatística sumir).
+// 2) Exibição direta opcional (experimental): com {"stopHookLine": true}, mostra a estatística do turno via
+//    systemMessage, no máximo uma vez por turno. Desligado por padrão — como o horário do disparo é impreciso,
+//    evita-se exibição precoce/repetida.
+// Saída em JSON estrito; qualquer exceção encerra em silêncio, sem afetar a conversa.
 
 import fs from "node:fs";
 import os from "node:os";
@@ -18,7 +21,7 @@ const STATE_FILE =
   process.env.TPS_MONITOR_STATE_FILE ||
   path.join(os.homedir(), ".zcode", "tps-monitor.last-session.json");
 
-// stdin 是钩子入参 JSON(含 session_id);设超时兜底,客户端不给 stdin 也不挂起
+// stdin é o JSON de entrada do hook (contém session_id); há um tempo limite de segurança para que não fique pendurado caso o cliente não forneça stdin
 function readStdin() {
   return new Promise((resolve) => {
     let raw = "";
@@ -54,8 +57,8 @@ function readStateFile() {
   }
 }
 
-// 写状态文件:sessionId/ts 跟随本次触发;promptTs 仅当同会话已有可信值时保留
-// (来源须是 prompt-submit/session-start;缺失时以当前时刻兜底,下一条消息即自愈)
+// Grava o arquivo de estado: sessionId/ts acompanham este disparo; o promptTs só é preservado quando já existe um valor confiável para a mesma sessão
+// (a origem deve ser prompt-submit/session-start; se ausente, usa o momento atual como segurança, e a próxima mensagem se autorrecupera)
 function writeState(fields) {
   try {
     fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
@@ -94,16 +97,16 @@ async function main() {
   const cfg = readConfig();
   if (cfg.tokenRateLine === false || cfg.stopHookLine !== true) return;
 
-  // 直显(实验):触发时机不定,等待数据就绪后按 turnId 去重,每轮最多显示一次
+  // Exibição direta (experimental): como o horário do disparo é impreciso, aguarda os dados ficarem prontos e depois deduplica por turnId, no máximo uma vez por turno
   let r = null;
   for (let i = 0; i < 5; i++) {
     r = queryTurn(sid || null);
     if (r && r.turn && r.turn.rated > 0) break;
     if (i < 4) await new Promise((res) => setTimeout(res, 250));
   }
-  if (!r || !r.turn) return; // 无本轮数据(如中断轮)则不打扰
+  if (!r || !r.turn) return; // sem dados do turno (ex.: turno interrompido), não incomoda
   const prev = readStateFile();
-  if (prev.lastShown && prev.lastShown.turnId === r.turnId) return; // 本轮已显示过
+  if (prev.lastShown && prev.lastShown.turnId === r.turnId) return; // já exibido neste turno
   writeState({ ...prev, lastShown: { turnId: r.turnId, at: Date.now() } });
   process.stdout.write(JSON.stringify({ systemMessage: formatTurnLine(r) }));
 }

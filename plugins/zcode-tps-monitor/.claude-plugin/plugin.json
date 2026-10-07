@@ -1,7 +1,7 @@
 {
   "name": "zcode-tps-monitor",
-  "version": "0.8.6",
-  "description": "Token rate monitor: per-question instant tokens/sec from the ZCode usage DB, shown at the end of each tool-using reply; /tps command, MCP tools, and a real-time dashboard. Supports a real metrics URL or built-in demo data for service TPS.",
+  "version": "0.8.7",
+  "description": "Monitor de TPS: comando /tps e ferramentas MCP para instantâneo de TPS, percentis de latência, taxa de erro e recursos do sistema local. Aceita URL de métricas real ou dados de demonstração embutidos para TPS de negócio.",
   "author": {
     "name": "Administrator"
   },
@@ -9,16 +9,16 @@
   "keywords": [
     "tps",
     "monitor",
-    "metrics",
-    "performance",
-    "throughput"
+    "métricas",
+    "desempenho",
+    "vazão"
   ],
   "commands": "commands",
   "skills": "skills",
   "userConfig": {
     "metrics_url": {
-      "title": "Metrics URL",
-      "description": "HTTP endpoint returning JSON with a tps/qps field; empty = demo data.",
+      "title": "URL de métricas",
+      "description": "Endpoint HTTP que retorna JSON com o campo tps/qps; vazio = dados de demonstração.",
       "type": "string",
       "required": false,
       "default": ""

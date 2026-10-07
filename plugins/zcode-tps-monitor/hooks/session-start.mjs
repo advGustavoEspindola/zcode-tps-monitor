@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// SessionStart hook:
-// 1) 记录"用户最后所处的会话"到状态文件(供数据服务锁定当前会话)
-// 2) 注入一行使用提示(严格 JSON 输出)
-// 3) 后台拉起 ensure-ui.mjs(大屏 + 桌面 tok/s 条),不阻塞钩子
+// Hook SessionStart:
+// 1) Registra no arquivo de estado a "última sessão em que o usuário esteve" (para o serviço de dados travar a sessão atual)
+// 2) Injeta uma linha de instruções de uso (saída em JSON estrito)
+// 3) Inicia em segundo plano o ensure-ui.mjs (painel + faixa de tok/s na área de trabalho), sem bloquear o hook
 
 import fs from "node:fs";
 import os from "node:os";
@@ -26,9 +26,8 @@ if (sid) {
   } catch {}
 }
 
-// 与 prompt-submit 的「本问统计」机制保持一致:先自测、再写正文,统计行与正文同条。
-// 关键是防折叠:客户端把带工具调用的消息折叠进「模型轨迹」区,若模型写完正文后
-// 补跑脚本、让统计行单独成条,用户就只能看到一行统计(正文被收起)。
+// Em consonância com o mecanismo de "estatística desta pergunta" do prompt-submit: primeiro medir por conta própria, depois escrever o corpo; a linha de estatística fica na mesma mensagem que o corpo.
+// O ponto crucial é o anti-recolhimento: o cliente recolhe mensagens com chamadas de ferramenta para a área "trajetória do modelo"; se o modelo escrever o corpo e só depois rodar o script, deixando a linha de estatística em mensagem isolada, o usuário verá apenas a linha de estatística (com o corpo recolhido).
 const hint = [
   `[zcode-tps-monitor] pronto. No fim de cada resposta que chamou ferramentas: rode node "${RATE_SCRIPT}" --turn --current ANTES de escrever o texto final, depois escreva a resposta completa e coloque a linha impressa intacta em um bloco de citacao Markdown no fim dessa mesma mensagem; sem saida do script (ex.: pergunta pura) nao ha linha de estatistica.`,
   "A linha de estatistica deve estar na mesma mensagem do texto final: nunca chame ferramentas depois do texto e nunca deixe a linha de estatistica vir sozinha — o cliente recolhe mensagens com ferramentas e o usuario veria so a linha.",
@@ -45,7 +44,7 @@ process.stdout.write(
   })
 );
 
-// 后台确保 UI(dash :7423 + overlay)在跑;失败静默,不影响会话
+// Garante em segundo plano que a UI (dash :7423 + overlay) está rodando; falhas são silenciosas e não afetam a sessão
 try {
   spawn(process.execPath, [path.join(HERE, "ensure-ui.mjs")], {
     detached: true,

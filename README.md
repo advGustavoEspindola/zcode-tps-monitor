@@ -1,4 +1,4 @@
-<img src="assets/icon.png" align="right" width="96" alt="zcode-tps-monitor 图标">
+<img src="assets/icon.png" align="right" width="96" alt="ícone do zcode-tps-monitor">
 
 # zcode-tps-monitor
 
@@ -6,142 +6,145 @@
 ![Node](https://img.shields.io/badge/node-%E2%89%A5%2022.5-brightgreen)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 
-**ZCode 会话级 Token 速率监控插件。** 每条**调用了工具**的回答,末尾都会附一行**本问**(本次提问)的即时 tok/s 统计——数据直接读取 ZCode usage 数据库,非模型自述、非估算,且有守卫保证**绝不显示上一轮**;另附实时监控大屏、斜杠命令、MCP 工具与可选的业务 TPS 监控。
+**Plugin de monitoramento da taxa de tokens em nível de sessão do ZCode.** Em toda resposta que **chamou ferramentas**, o final traz uma linha com estatísticas instantâneas de tok/s da **pergunta atual** (desta questão) — os dados vêm direto do banco de dados de usage do ZCode, sem autodescrição do modelo e sem estimativas, com uma proteção que garante **nunca exibir o turno anterior**; além de um painel (dashboard) de monitoramento em tempo real, comandos de barra, ferramentas MCP e monitoramento opcional de TPS de negócio.
 
-> 本仓库同时是一个 ZCode 本地插件市场(marketplace 名称:`tps-local-marketplace`),插件本体位于 [`plugins/zcode-tps-monitor/`](plugins/zcode-tps-monitor/README.md)。
+> Este repositório é também um marketplace local de plugins do ZCode (nome do marketplace: `tps-local-marketplace`), e o corpo do plugin está em [`plugins/zcode-tps-monitor/`](plugins/zcode-tps-monitor/README.md).
 
-## 效果预览
+## Prévia do efeito
 
-每条回复收尾时,模型运行插件脚本自测**本次提问**的真实速率,并把统计行附在回复末尾——多段工具调用的长轮次按"总产出 / 总生成时长"加权:
+Ao final de cada resposta, o modelo executa o script do plugin para medir a taxa real **desta pergunta** e anexa a linha de estatísticas no fim da resposta — turnos longos com várias etapas de chamada de ferramentas são ponderados por "produção total / tempo total de geração":
 
-![token 速率行效果](plugins/zcode-tps-monitor/docs/effect-token-rate.png)
+![efeito da linha de taxa de tokens](plugins/zcode-tps-monitor/docs/effect-token-rate.png)
 
-| 字段 | 含义 |
+| Campo | Significado |
 |---|---|
-| `537.3 tok/s (este turno)` | 本问即时输出速率(含思考 token;多段轮次为加权速率) |
-| `TTFT 3.0s` | 首 token 延迟(TTFT,本问第一段) |
-| `saida 223 tok / geracao 0.4s` | 本问输出 token 数与纯生成耗时(不含段间工具等待) |
-| `2 etapas / pico 537.3` | 本问的请求段数与单段峰值速率(多段轮次才显示) |
-| `acumulado 51.3k tok` | 当前会话累计输出(独立统计,不受窗口限制) |
-| `⏱ 10:23:04` | 采样时刻(最近一次工具调用之后) |
+| `537.3 tok/s (este turno)` | Taxa de saída instantânea da pergunta atual (inclui tokens de pensamento; em turnos de várias etapas, a taxa é ponderada) |
+| `TTFT 3.0s` | Latência do primeiro token (TTFT, primeira etapa desta pergunta) |
+| `saida 223 tok / geracao 0.4s` | Número de tokens de saída e tempo puro de geração desta pergunta (não inclui a espera por ferramentas entre etapas) |
+| `2 etapas / pico 537.3` | Número de etapas de solicitação e a taxa de pico de uma etapa desta pergunta (só é exibido em turnos de várias etapas) |
+| `acumulado 51.3k tok` | Saída acumulada da sessão atual (contagem independente, sem limite de janela) |
+| `⏱ 10:23:04` | Momento da amostragem (após a chamada de ferramenta mais recente) |
 
-数字显示规则:每问「saida」用千分位精确数字(如 `2,762 tok`);「acumulado」用紧凑单位——千以下原始、1k~1万一位小数(`9.8k`)、1万~100万取整(`51k`)、百万以上一位小数 M(`73.8M`)。速率行文案自 0.8.6 起为 pt-BR(示例标签即现行输出)。
+Regras de exibição de números: em cada pergunta, "saida" usa número exato com separador de milhar (ex.: `2,762 tok`); "acumulado" usa unidade compacta — abaixo de mil, valor bruto; de 1k a 10 mil, uma casa decimal (`9.8k`); de 10 mil a 1 milhão, arredondado (`51k`); acima de 1 milhão, uma casa decimal com M (`73.8M`). Os textos da linha de taxa estão em pt-BR desde a 0.8.6 (os rótulos de exemplo são a saída atual).
 
-## 功能特性
+## Recursos
 
-- **真实 Token 速率(默认开启)** —— 每条调用了工具的回答末尾自动附**本问即时 tok/s**(含思考 token)、首字延迟、输出 token 数、生成耗时、段数/峰值与会话累计;`--current` 守卫保证绝不把上一轮数据当作本问显示
-- **实时监控大屏** —— `/zcode-tps-monitor:dashboard` 一键拉起,浏览器深色运维风格面板,秒级自动刷新;空闲 3 小时自动退出,不留后台进程
-- **斜杠命令** —— `/tps` 即时快照;`/tps 10` 采样观察 10 秒;`/tps-doctor` 环境自检
-- **MCP 工具** —— `tps_snapshot` / `tps_watch`,供 agent 程序化取数
-- **悬浮条(Windows)** —— 桌面常驻文字悬浮条,随时可见当前速率
-- **业务 TPS 监控(可选)** —— 配置 `metrics_url` 接入真实业务指标接口,或使用内置演示数据
+- **Taxa de tokens real (ativada por padrão)** — ao final de cada resposta que chamou ferramentas, é anexada automaticamente a **taxa instantânea de tok/s da pergunta atual** (incluindo tokens de pensamento), a latência do primeiro token, o número de tokens de saída, o tempo de geração, o número de etapas/pico e o acumulado da sessão; a proteção `--current` garante nunca exibir dados do turno anterior como se fossem da pergunta atual
+- **Painel (dashboard) de monitoramento em tempo real** — `/zcode-tps-monitor:dashboard` inicia com um clique; painel em estilo escuro de operações no navegador, com atualização automática a cada segundo; sai automaticamente após 3 horas ocioso, sem deixar processos em segundo plano
+- **Comandos de barra** — `/tps` para uma fotografia instantânea; `/tps 10` para amostrar por 10 segundos; `/tps-doctor` para autodiagnóstico do ambiente
+- **Ferramentas MCP** — `tps_snapshot` / `tps_watch`, para que o agent obtenha dados de forma programática
+- **Barra flutuante (Windows)** — barra de texto flutuante permanente na área de trabalho, com a taxa atual sempre visível
+- **Monitoramento de TPS de negócio (opcional)** — configure `metrics_url` para conectar a uma interface real de métricas de negócio ou use os dados de demonstração embutidos
 
-## 安装
+## Instalação
 
-### 方式一:从 GitHub 添加(推荐)
+### Opção 1: adicionar pelo GitHub (recomendado)
 
-在 ZCode 中执行:
+Execute no ZCode:
 
 ```text
 /plugin marketplace add shy3130/zcode-tps-monitor
 /plugin install zcode-tps-monitor@tps-local-marketplace
 ```
 
-### 方式二:本地目录
+### Opção 2: diretório local
 
-克隆本仓库后,在 ZCode 中打开 **设置 → 插件管理 → 发现 → +**,来源选择"本地目录",指向仓库根目录即可。
+Após clonar este repositório, abra no ZCode **Configurações → Gerenciamento de plugins → Descobrir → +**, escolha "diretório local" como origem e aponte para a raiz do repositório.
 
-### 更新
+## Atualização
 
 ```text
 /plugin marketplace update tps-local-marketplace
 ```
 
-更新后重装/升级插件,并重开会话使钩子重新注册。
+Depois de atualizar, reinstale/atualize o plugin e reabra a sessão para que os hooks sejam registrados novamente.
 
-## 使用
+## Uso
 
-| 场景 | 操作 |
+| Cenário | Ação |
 |---|---|
-| 查看本问速率 | 无需操作:调用了工具的回答,末尾自动附本问统计行(纯问答不显示) |
-| 即时快照 | 输入 `/tps`;或 `/tps 10` 持续采样 10 秒 |
-| 打开监控大屏 | 输入 `/zcode-tps-monitor:dashboard`,或手动 `node dashboard/server.mjs` |
-| 环境自检 | 速率行不见了?输入 `/tps-doctor` 逐项排查 |
-| 关闭速率注入(含末尾统计行) | `~/.zcode/tps-monitor.config.json` 写入 `{"tokenRateLine": false}`,重开会话生效 |
-| 桌面悬浮条 | 运行 `dashboard/overlay.ps1`(Windows) |
-| agent 取数 | MCP 工具 `tps_snapshot` / `tps_watch` |
+| Ver a taxa da pergunta atual | Nenhuma ação necessária: em respostas que chamaram ferramentas, a linha de estatísticas da pergunta atual é anexada automaticamente no final (não é exibida em respostas sem chamada de ferramentas) |
+| Fotografia instantânea | Digite `/tps`; ou `/tps 10` para amostrar continuamente por 10 segundos |
+| Abrir o painel de monitoramento | Digite `/zcode-tps-monitor:dashboard`, ou manualmente `node dashboard/server.mjs` |
+| Autodiagnóstico do ambiente | A linha de taxa desapareceu? Digite `/tps-doctor` para verificar item a item |
+| Desativar a injeção da taxa (incluindo a linha de estatísticas no final) | Escreva `{"tokenRateLine": false}` em `~/.zcode/tps-monitor.config.json`; reabra a sessão para surtir efeito |
+| Barra flutuante na área de trabalho | Execute `dashboard/overlay.ps1` (Windows) |
+| Obtenção de dados pelo agent | Ferramentas MCP `tps_snapshot` / `tps_watch` |
 
-要求 Node ≥ 22.5(需内置 `node:sqlite`,Windows / macOS / Linux 相同)。
+Requer Node ≥ 22.5 (é necessário o `node:sqlite` embutido; o mesmo vale para Windows / macOS / Linux).
 
-## 配置:接入业务 TPS(可选)
+## Configuração: conectar ao TPS de negócio (opcional)
 
-插件默认提供演示数据;若要监控真实业务吞吐,在 **设置 → 插件管理 → zcode-tps-monitor** 中配置 `metrics_url`,指向任意返回 JSON 的指标接口。字段自动兼容(支持最多三层嵌套):
+Por padrão, o plugin fornece dados de demonstração; para monitorar a vazão real de negócio, configure `metrics_url` em **Configurações → Gerenciamento de plugins → zcode-tps-monitor**, apontando para qualquer interface de métricas que retorne JSON. Os campos são compatíveis automaticamente (suporta até três níveis de aninhamento):
 
-| 指标 | 识别的字段名 |
+| Métrica | Nomes de campo reconhecidos |
 |---|---|
-| 吞吐 | `tps` / `qps` / `throughput` / `transactionsPerSecond` |
-| 延迟 | `p50` / `p95` / `p99`(或 `latency_p50` 等) |
-| 错误率 | `error_rate` / `errorRate` / `err_rate` |
+| Vazão | `tps` / `qps` / `throughput` / `transactionsPerSecond` |
+| Latência | `p50` / `p95` / `p99` (ou `latency_p50`, etc.) |
+| Taxa de erro | `error_rate` / `errorRate` / `err_rate` |
 
-示例接口返回:
+Exemplo de retorno da interface:
 
 ```json
 {"data":{"tps":1240,"p50":11,"p95":28,"p99":46,"error_rate":0.05}}
 ```
 
-## 工作原理
+## Como funciona
 
 ```
-用户发送消息
+Usuário envia uma mensagem
    │
    ▼
-UserPromptSubmit 钩子
-   │  记录提问时刻到状态文件;注入上一轮速率(仅作模型内部参考,禁止展示)
-   │  并下达「本问统计指令」
+Hook UserPromptSubmit
+   │  Registra o momento da pergunta no arquivo de estado; injeta a taxa do turno
+   │  anterior (apenas como referência interna do modelo, proibido exibir)
+   │  e emite a "instrução de estatísticas da pergunta atual"
    ▼
-模型回复(工具调用 × N 段,每段完成即实时写入 usage 库)
+Resposta do modelo (chamadas de ferramentas × N etapas; cada etapa é gravada em
+tempo real no banco de usage)
    │
    ▼
-回复收尾(输出最终总结之前)
-   │  模型运行 token-rate.mjs --turn --current:
-   │  按本次提问触发的 turn_id 圈定本问全部请求,
-   │  计算即时速率(总产出 / 总纯生成时长)
+Fim da resposta (antes de emitir o resumo final)
+   │  O modelo executa token-rate.mjs --turn --current:
+   │  delimita, pelo turn_id acionado por esta pergunta, todas as solicitações
+   │  da pergunta atual, e calcula a taxa instantânea
+   │  (produção total / tempo total de geração pura)
    ▼
-把统计行放入 Markdown 引用块,贴在回复最末尾
+Coloca a linha de estatísticas num bloco de citação Markdown, no fim da resposta
 ```
 
-- **SessionStart 钩子**:会话启动时记录当前会话 ID 并注入使用提示
-- **UserPromptSubmit 钩子**:每轮触发一次,单次为毫秒级数据库读取,开销可忽略;此刻本问尚未发生,注入的上一轮速率仅作模型上下文(标注「内部背景·勿展示」)
-- **收尾自测(`--turn --current`)**:本问的各段请求在回答过程中已实时入库,收尾时统计即为完整的本问数据;`--current` 守卫把状态文件里的提问时刻与本问数据比对,本问尚无入库数据(纯问答轮)时输出为空——**结构上杜绝了"显示上一轮"**
-- **Stop 钩子(实验)**:客户端现已触发 Stop 事件,但时机不定(曾观察到用户轮次进行中触发),因此默认只维护状态文件、绝不覆盖提问时间戳;配置 `{"stopHookLine": true}` 可实验性开启回复结束直显(每个轮次最多一次)
-- Token 速率与业务 TPS 相互独立:前者始终来自 ZCode 真实数据,后者取决于是否配置 `metrics_url`
+- **Hook SessionStart**: registra o ID da sessão atual ao iniciar a sessão e injeta uma dica de uso
+- **Hook UserPromptSubmit**: disparado uma vez por turno; cada disparo é uma leitura de banco em milissegundos, com custo desprezível; neste momento a pergunta atual ainda não ocorreu, então a taxa do turno anterior injetada serve apenas como contexto do modelo (prefixo `[contexto interno · nao mostrar]`, literal do runtime)
+- **Autoteste no fim (`--turn --current`)**: as solicitações de cada etapa da pergunta atual já foram gravadas em tempo real durante a resposta, então a estatística no fim é o dado completo da pergunta atual; a proteção `--current` compara o momento da pergunta no arquivo de estado com os dados da pergunta atual, e quando ainda não há dados gravados (turno de puro perguntas e respostas) a saída fica vazia — **eliminando estruturalmente "exibir o turno anterior"**
+- **Hook Stop (experimental)**: o cliente agora dispara o evento Stop, mas o momento é variável (já se observou o disparo durante um turno do usuário); por isso, por padrão, apenas mantém o arquivo de estado e nunca sobrescreve o carimbo de data/hora da pergunta; configure `{"stopHookLine": true}` para ativar experimentalmente a exibição direta ao fim da resposta (no máximo uma vez por turno)
+- A taxa de tokens e o TPS de negócio são independentes entre si: a primeira vem sempre de dados reais do ZCode; a segunda depende de `metrics_url` estar configurado
 
-## 常见问题
+## Perguntas frequentes
 
-**Q:可以在 OpenCode / Codex / Claude Code 等其他工具中使用吗?**
+**Q: posso usar em outras ferramentas como OpenCode / Codex / Claude Code?**
 
-A:插件机制、钩子与数据源均绑定 ZCode,token 速率功能是 ZCode 专属;其中业务 TPS 采集脚本与大屏是独立程序,可脱离 ZCode 运行,但离开 ZCode 没有速率数据来源。
+A: os mecanismos do plugin, os hooks e as fontes de dados são todos vinculados ao ZCode; a função de taxa de tokens é exclusiva do ZCode. O script de coleta de TPS de negócio e o painel são programas independentes, que podem rodar sem o ZCode, mas sem o ZCode não há fonte de dados de taxa.
 
-**Q:显示的速率准确吗?**
+**Q: a taxa exibida é precisa?**
 
-A:速率由 ZCode usage 数据库中的真实 token 累计值计算得出,口径为模型输出侧 token。统计覆盖"本次提问 → 最近一次工具调用"的全部请求段,按"总产出 / 总纯生成时长"加权(段间工具等待不计入生成时长);最终总结文字在最近一次工具调用之后生成,不计入。与其他工具显示的统计数字可能因统计窗口不同而略有差异。
+A: a taxa é calculada a partir dos valores reais acumulados de tokens no banco de usage do ZCode, com base nos tokens do lado de saída do modelo. A estatística cobre todas as etapas de solicitação de "esta pergunta → a chamada de ferramenta mais recente", ponderada por "produção total / tempo total de geração pura" (a espera por ferramentas entre etapas não conta no tempo de geração); o texto do resumo final é gerado após a chamada de ferramenta mais recente e não é contado. Os números exibidos por outras ferramentas podem diferir ligeiramente devido a janelas de estatística diferentes.
 
-**Q:纯问答回复(没调用工具)为什么没有统计行?**
+**Q: por que respostas de puro perguntas e respostas (sem chamada de ferramentas) não têm linha de estatísticas?**
 
-A:这是有意的。收尾自测发生在回复结束之前,而纯问答轮唯一的模型请求要等回复结束才写入数据库——此刻它还不可见。`--current` 守卫检测到"本问尚无入库数据"就不输出任何统计行,绝不会拿上一轮的数据充数。想看最近的统计可运行 `/tps` 或打开监控大屏。
+A: é intencional. O autoteste no fim acontece antes de a resposta terminar, enquanto a única solicitação do modelo num turno de puro perguntas e respostas só é gravada no banco depois que a resposta termina — nesse momento ela ainda não está visível. A proteção `--current`, ao detectar que "ainda não há dados gravados da pergunta atual", não emite nenhuma linha de estatísticas e nunca usa dados do turno anterior como substituto. Para ver as estatísticas mais recentes, execute `/tps` ou abra o painel de monitoramento.
 
-**Q:速率行突然不见了?**
+**Q: a linha de taxa desapareceu de repente?**
 
-A:运行 `/tps-doctor` 自检。常见原因:Node 版本低于 22.5(需内置 `node:sqlite`)、ZCode 更新后表结构变化、升级插件后未重开会话(钩子需新会话注册)、或配置文件里关闭了注入。
+A: execute `/tps-doctor` para o autodiagnóstico. Causas comuns: versão do Node abaixo de 22.5 (é necessário o `node:sqlite` embutido), mudança na estrutura de tabelas após atualização do ZCode, sessão não reaberta após atualizar o plugin (os hooks precisam de uma nova sessão para se registrar) ou a injeção desativada no arquivo de configuração.
 
-**Q:macOS / Linux 支持吗?**
+**Q: há suporte a macOS / Linux?**
 
-A:支持。钩子、命令、大屏、MCP 均为跨平台 Node 实现;usage 数据库路径按用户主目录自动解析(`~/.zcode/cli/db/db.sqlite`),特殊安装位置可用 `ZCODE_USAGE_DB` 环境变量覆盖。唯一例外是桌面悬浮条 `overlay.ps1`,它依赖 Windows API,仅限 Windows(macOS 用户用监控大屏即可)。
+A: sim. Os hooks, comandos, painel e MCP são todas implementações Node multiplataforma; o caminho do banco de usage é resolvido automaticamente a partir do diretório inicial do usuário (`~/.zcode/cli/db/db.sqlite`), e pode ser sobrescrito pela variável de ambiente `ZCODE_USAGE_DB` em instalações fora do padrão. A única exceção é a barra flutuante na área de trabalho `overlay.ps1`, que depende da API do Windows e é exclusiva de Windows (no macOS, basta usar o painel de monitoramento).
 
-**Q:演示数据怎么关掉?**
+**Q: como desativo os dados de demonstração?**
 
-A:演示数据只影响"业务 TPS"部分(Token 速率始终真实);不配置 `metrics_url` 即为演示模式,配置后自动切换为真实数据源。
+A: os dados de demonstração afetam apenas a parte de "TPS de negócio" (a taxa de tokens é sempre real); sem `metrics_url` configurado, o modo é de demonstração, e ao configurar ele muda automaticamente para uma fonte de dados reais.
 
-## License
+## Licença
 
 [MIT](LICENSE) © 2026 shy3130

@@ -1,17 +1,17 @@
 ---
-description: 自检 zcode-tps-monitor 插件:数据库、依赖与运行状态排查
+description: Autodiagnóstico do plugin zcode-tps-monitor: banco de dados, dependências e verificação do estado de execução
 ---
 
-运行插件自检并以中文向用户汇报结果。
+Execute o autodiagnóstico do plugin e relate os resultados ao usuário em português do Brasil.
 
-执行步骤:
+Etapas de execução:
 
-1. 运行自检脚本(本命令文件所在目录的 `../../scripts/doctor.mjs`):
+1. Execute o script de autodiagnóstico (`../../scripts/doctor.mjs` no mesmo diretório deste arquivo de comando):
    ```bash
    node ../../scripts/doctor.mjs
    ```
-2. 逐项解读输出(✅/❌):Node 版本、usage 数据库、会话状态文件、配置文件、大屏进程。
-3. 对 ❌ 项,按脚本给出的 hint 给出修复建议(常见:Node 升级到 ≥22.5、设置 ZCODE_USAGE_DB、重装插件后重开会话)。
-4. 用户想关闭每轮速率行时,告知:写入 `~/.zcode/tps-monitor.config.json` 内容 `{"tokenRateLine": false}`,重开会话生效。
+2. Interprete a saída item por item (✅/❌): versão do Node, banco de dados de uso, arquivo de estado da sessão, arquivo de configuração, processo do dashboard.
+3. Para os itens ❌, ofereça sugestões de correção com base na hint fornecida pelo script (comuns: atualizar o Node para ≥22.5, definir ZCODE_USAGE_DB, reinstalar o plugin e reabrir a sessão).
+4. Se o usuário quiser desativar a linha de taxa por turno, informe: grave o conteúdo `{"tokenRateLine": false}` em `~/.zcode/tps-monitor.config.json` e reabra a sessão para que a mudança tenha efeito.
 
-用户附加要求:$ARGUMENTS
+Solicitação adicional do usuário: $ARGUMENTS

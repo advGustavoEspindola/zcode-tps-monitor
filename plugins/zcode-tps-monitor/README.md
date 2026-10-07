@@ -1,112 +1,112 @@
 # zcode-tps-monitor
 
-项目介绍、安装与使用说明见[仓库首页 README](../../README.md)。本文件面向插件内部结构与开发测试。
+A apresentação do projeto, a instalação e as instruções de uso estão no [README da página inicial do repositório](../../README.md). Este documento é voltado à estrutura interna do plugin e ao desenvolvimento/teste.
 
-## 能力一览
+## Visão das capacidades
 
-| 形态 | 入口 | 说明 |
+| Formato | Entrada | Descrição |
 |---|---|---|
-| 本问统计 | `hooks/prompt-submit.mjs` + `scripts/token-rate.mjs` | 每轮注入「本问统计指令」:模型在回复收尾时运行 `token-rate.mjs --turn --current`,把本问即时速率行附在回复末尾;`--current` 守卫保证绝不显示上一轮。`{"tokenRateLine": false}` 可整体关闭 |
-| 上下文注入 | `hooks/prompt-submit.mjs` | 每轮读取 ZCode usage 数据库,注入上一轮速率作为模型内部参考(标注勿展示);随 tokenRateLine 一并关闭 |
-| 会话提示 | `hooks/session-start.mjs` | 会话启动时记录会话 ID,并注入使用提示(收尾自测机制说明);后台拉起 `ensure-ui.mjs` |
-| UI 自举 | `hooks/ensure-ui.mjs` | SessionStart 后台确保大屏 `:7423` 与桌面 tok/s 条在跑(缺失才启动,失败静默) |
-| 自检 | `/tps-doctor`(`scripts/doctor.mjs`) | 检查 Node 版本、数据库与表结构、状态/配置文件、大屏进程;`--json` 可编程消费 |
-| 实时大屏 | `dashboard/server.mjs` | 浏览器监控面板,秒级自动刷新,含「最新一问(本问)」实时卡片;`/zcode-tps-monitor:dashboard` 拉起,或手动运行 |
-| tok/s 条 | `dashboard/overlay.ps1` | Windows 上贴在 ZCode composer 底部的 StatsLine(estilo DSH):灰字、无背景、单实例、跟随主窗口 |
-| 斜杠命令 | `/zcode-tps-monitor:tps` | 即时快照;`/zcode-tps-monitor:tps 10` 采样观察 10 秒 |
-| 技能 | `zcode-tps-monitor` | 用户询问速率/TPS 相关问题时自动触发 |
-| MCP 工具 | `tps_snapshot` / `tps_watch` | stdio MCP server(`mcp/tps-server.mjs`),供 agent 程序化取数 |
-| Stop 钩子(实验) | `hooks/stop.mjs` | 客户端现已触发 Stop 事件,但时机不定(观察到轮次进行中触发);默认仅维护状态文件且不覆盖提问时间戳;`{"stopHookLine": true}` 可开启直显(每轮一次) |
+| Estatística da pergunta atual | `hooks/prompt-submit.mjs` + `scripts/token-rate.mjs` | A cada turno injeta a "instrução de estatística da pergunta atual": o modelo executa `token-rate.mjs --turn --current` ao encerrar a resposta e anexa a linha de taxa instantânea da pergunta atual ao final da resposta; a proteção `--current` garante que a pergunta anterior nunca seja exibida. `{"tokenRateLine": false}` desativa tudo |
+| Injeção de contexto | `hooks/prompt-submit.mjs` | A cada turno lê o banco de dados de uso do ZCode e injeta a taxa do turno anterior como referência interna do modelo (marcada como "não exibir"); é desativada junto com tokenRateLine |
+| Aviso de sessão | `hooks/session-start.mjs` | Ao iniciar a sessão, registra o ID da sessão e injeta um aviso de uso (explicação do mecanismo de autoteste ao encerrar); inicia `ensure-ui.mjs` em segundo plano |
+| Bootstrap do UI | `hooks/ensure-ui.mjs` | Após o SessionStart, garante em segundo plano que o painel (dashboard) em `:7423` e a barra de tok/s no desktop estejam em execução (só inicia se estiverem ausentes; falhas são silenciosas) |
+| Autodiagnóstico | `/tps-doctor` (`scripts/doctor.mjs`) | Verifica a versão do Node, o banco de dados e o esquema das tabelas, os arquivos de estado/configuração e o processo do dashboard; `--json` permite consumo programático |
+| Dashboard em tempo real | `dashboard/server.mjs` | Painel de monitoramento no navegador, com atualização automática a cada segundo, incluindo o cartão em tempo real da "pergunta mais recente (pergunta atual)"; iniciado por `/zcode-tps-monitor:dashboard` ou executado manualmente |
+| Barra de tok/s | `dashboard/overlay.ps1` | No Windows, uma StatsLine fixada na parte inferior do composer do ZCode (estilo DSH): texto cinza, sem fundo, instância única, acompanhando a janela principal |
+| Comando slash | `/zcode-tps-monitor:tps` | Instantâneo imediato; `/zcode-tps-monitor:tps 10` faz amostragem por 10 segundos |
+| Skill | `zcode-tps-monitor` | Acionado automaticamente quando o usuário pergunta sobre taxa/TPS |
+| Ferramentas MCP | `tps_snapshot` / `tps_watch` | Servidor MCP via stdio (`mcp/tps-server.mjs`), para o agent obter dados programaticamente |
+| Stop hook (experimental) | `hooks/stop.mjs` | O cliente agora dispara o evento Stop, mas o momento é imprevisível (observado disparando no meio de turnos); por padrão apenas mantém o arquivo de estado e não sobrescreve o timestamp da pergunta; `{"stopHookLine": true}` ativa a exibição direta (uma vez por turno) |
 
-## 数据源
+## Fontes de dados
 
-### Token 速率(真实,默认开启)
+### Taxa de tokens (real, ativada por padrão)
 
-由钩子读取 ZCode usage 数据库(`model_usage` 表)计算,可手动验证:
+Calculada pelos hooks a partir do banco de dados de uso do ZCode (tabela `model_usage`); pode ser verificada manualmente:
 
 ```bash
-node scripts/token-rate.mjs                  # 最近一次请求 + 会话统计
-node scripts/token-rate.mjs --turn --current # 最新一问(本问)即时统计,本问无数据时不输出
+node scripts/token-rate.mjs                  # requisição mais recente + estatísticas da sessão
+node scripts/token-rate.mjs --turn --current # estatística instantânea da pergunta mais recente (atual); sem dados, não há saída
 node scripts/token-rate.mjs --json           # JSON
 ```
 
-可设置 `ZCODE_SESSION_ID` 环境变量只统计当前会话(钩子已自动设置)。
+É possível definir a variável de ambiente `ZCODE_SESSION_ID` para contar apenas a sessão atual (os hooks já fazem isso automaticamente).
 
-数据库路径默认按用户主目录解析(`~/.zcode/cli/db/db.sqlite`,Windows 同理),可用 `ZCODE_USAGE_DB` 环境变量覆盖;以只读方式打开 WAL 库,不影响运行中的客户端。
+O caminho do banco de dados é resolvido, por padrão, a partir do diretório pessoal do usuário (`~/.zcode/cli/db/db.sqlite`, o mesmo no Windows) e pode ser sobrescrito pela variável de ambiente `ZCODE_USAGE_DB`; o banco WAL é aberto em modo somente leitura, sem afetar o cliente em execução.
 
-### 业务 TPS(demo / remote)
+### TPS de negócio (demo / remote)
 
-- **demo(默认)**:内置模拟数据(随机游走,数值连续逼真),开箱即可看到效果。
-- **remote(真实)**:在 **设置 → 插件管理 → zcode-tps-monitor** 中配置 `metrics_url`,
-  指向任何返回 JSON 的指标接口。字段兼容(支持最多三层嵌套):
-  - 吞吐:`tps` / `qps` / `throughput` / `transactionsPerSecond`
-  - 延迟:`p50` / `p95` / `p99`(或 `latency_p50` 等)
-  - 错误率:`error_rate` / `errorRate` / `err_rate`
+- **demo (padrão)**: dados simulados embutidos (random walk, valores contínuos e realistas), pronto para uso imediato.
+- **remote (real)**: configure `metrics_url` em **Configurações → Gerenciamento de plugins → zcode-tps-monitor**,
+  apontando para qualquer endpoint de métricas que retorne JSON. Os campos são compatíveis (até três níveis de aninhamento):
+  - Vazão: `tps` / `qps` / `throughput` / `transactionsPerSecond`
+  - Latência: `p50` / `p95` / `p99` (ou `latency_p50` etc.)
+  - Taxa de erro: `error_rate` / `errorRate` / `err_rate`
 
-  例:`{"data":{"tps":1240,"p50":11,"p95":28,"p99":46,"error_rate":0.05}}`
+  Exemplo: `{"data":{"tps":1240,"p50":11,"p95":28,"p99":46,"error_rate":0.05}}`
 
-## 开发与测试
+## Desenvolvimento e testes
 
 ```bash
-# 实时大屏(默认 http://127.0.0.1:7423;空闲 180 分钟自退,--idle-exit 0 关闭)
+# Dashboard em tempo real (padrão http://127.0.0.1:7423; sai sozinho após 180 minutos ocioso, --idle-exit 0 desativa)
 node dashboard/server.mjs
 node dashboard/server.mjs --port 8080
 node dashboard/server.mjs --idle-exit 30
-TPS_URL=http://host/metrics node dashboard/server.mjs   # 接真实数据源
+TPS_URL=http://host/metrics node dashboard/server.mjs   # conecta a uma fonte de dados real
 
-# 自检
-node scripts/doctor.mjs             # 人类可读(❌ 项给出修复建议)
-node scripts/doctor.mjs --json      # JSON,失败时退出码 1
+# Autodiagnóstico
+node scripts/doctor.mjs             # legível para humanos (itens ❌ trazem sugestões de correção)
+node scripts/doctor.mjs --json      # JSON; código de saída 1 em caso de falha
 
-# 业务 TPS 采集 CLI
-node scripts/collect.mjs            # 人类可读快照
+# CLI de coleta do TPS de negócio
+node scripts/collect.mjs            # instantâneo legível para humanos
 node scripts/collect.mjs --json     # JSON
-node scripts/collect.mjs --watch 5  # 采样 5 秒
+node scripts/collect.mjs --watch 5  # amostra por 5 segundos
 
-# 单元测试(仓库根目录;临时库夹具,不读真实数据)
+# Testes unitários (raiz do repositório; fixture com banco temporário, não lê dados reais)
 node --test
 ```
 
 ```bash
-# MCP server 冒烟
+# Smoke test do servidor MCP
 printf '%s\n' \
   '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"manual","version":"0"}}}' \
   '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
   | node mcp/tps-server.mjs
 ```
-## 目录结构
+## Estrutura de diretórios
 
 ```
 zcode-tps-monitor/
-├── .zcode-plugin/plugin.json   # 插件清单(name / userConfig)
-├── .claude-plugin/plugin.json  # 兼容清单
-├── .mcp.json                   # MCP server 注册(${ZCODE_PLUGIN_ROOT})
+├── .zcode-plugin/plugin.json   # manifesto do plugin (name / userConfig)
+├── .claude-plugin/plugin.json  # manifesto de compatibilidade
+├── .mcp.json                   # registro do servidor MCP (${ZCODE_PLUGIN_ROOT})
 ├── commands/tps.md             # /zcode-tps-monitor:tps
 ├── commands/dashboard.md       # /zcode-tps-monitor:dashboard
 ├── commands/tps-doctor.md      # /zcode-tps-monitor:tps-doctor
-├── skills/zcode-tps-monitor/SKILL.md  # 自动触发技能
-├── hooks/hooks.json            # 钩子注册(SessionStart + UserPromptSubmit + Stop)
-├── hooks/session-start.mjs     # 会话启动:记录会话 ID + 使用提示
-├── hooks/prompt-submit.mjs     # 每轮:记录提问时刻 + 注入上一轮参考 + 本问统计指令
-├── hooks/stop.mjs              # 客户端现已触发;维护状态文件(保留 promptTs),直显默认关
-├── mcp/tps-server.mjs          # stdio MCP server
+├── skills/zcode-tps-monitor/SKILL.md  # skill de acionamento automático
+├── hooks/hooks.json            # registro dos hooks (SessionStart + UserPromptSubmit + Stop)
+├── hooks/session-start.mjs     # início da sessão: registra o ID da sessão + aviso de uso
+├── hooks/prompt-submit.mjs     # a cada turno: registra o momento da pergunta + injeta a referência do turno anterior + a instrução de estatística da pergunta atual
+├── hooks/stop.mjs              # agora é disparado pelo cliente; mantém o arquivo de estado (preserva promptTs); exibição direta desativada por padrão
+├── mcp/tps-server.mjs          # servidor MCP via stdio
 ├── dashboard/
-│   ├── server.mjs              # HTTP 服务(页面 + /api/metrics)
-│   ├── index.html              # 大屏布局(纯原生,无外部依赖)
-│   └── overlay.ps1             # Windows 悬浮条
+│   ├── server.mjs              # servidor HTTP (página + /api/metrics)
+│   ├── index.html              # layout do dashboard (puro nativo, sem dependências externas)
+│   └── overlay.ps1             # barra flutuante do Windows
 ├── scripts/
-│   ├── token-rate.mjs          # token 速率 CLI(人类可读 / --json)
-│   ├── collect.mjs             # 业务 TPS CLI 入口
-│   ├── doctor.mjs              # 自检(人类可读 / --json)
-│   └── lib/collect-core.mjs    # 采集核心(CLI/MCP 共用,零依赖)
+│   ├── token-rate.mjs          # CLI de taxa de tokens (legível para humanos / --json)
+│   ├── collect.mjs             # entrada do CLI de TPS de negócio
+│   ├── doctor.mjs              # autodiagnóstico (legível para humanos / --json)
+│   └── lib/collect-core.mjs    # núcleo de coleta (compartilhado por CLI/MCP, zero dependências)
 └── docs/
-    └── effect-token-rate.png   # 效果截图
+    └── effect-token-rate.png   # captura de tela do resultado
 ```
 
-## 修改后生效
+## Aplicando as modificações
 
-在 **设置 → 插件管理** 中重新安装/刷新插件,并重开会话使钩子重新注册。要求 Node ≥ 22.5(需内置 `node:sqlite`)。
+Em **Configurações → Gerenciamento de plugins**, reinstale/atualize o plugin e reabra a sessão para que os hooks sejam registrados novamente. Requer Node ≥ 22.5 (é necessário o `node:sqlite` embutido).
 
-## License
+## Licença
 
 [MIT](../../LICENSE)

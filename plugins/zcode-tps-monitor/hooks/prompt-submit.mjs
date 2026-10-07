@@ -1,12 +1,15 @@
 #!/usr/bin/env node
-// UserPromptSubmit hook: 每次用户发消息时
-// 1) 记录"用户最后所处的会话"与提问时间戳到状态文件(--current 守卫依赖该时间戳)
-// 2) 注入上一轮速率作为模型上下文,并下达"本问统计"指令:
-//    模型在写最终回复正文之前运行 token-rate.mjs --turn --current,把输出的"本问"速率行
-//    原样引用在同一条回复的最末尾。--current 保证绝不把上一轮数据冒充本问(纯问答轮无输出)。
-// 输出必须为严格 JSON。
-// 可选配置 ~/.zcode/tps-monitor.config.json:
-//   {"tokenRateLine": false} 关闭全部速率注入。
+// Hook UserPromptSubmit: executado a cada mensagem do usuário.
+// 1) Registra no arquivo de estado a "última sessão em que o usuário esteve" e o timestamp da pergunta
+//    (a guarda --current depende desse timestamp).
+// 2) Injeta a taxa da rodada anterior como contexto do modelo e emite a instrução de "estatística desta
+//    pergunta": antes de escrever o texto final da resposta, o modelo roda token-rate.mjs --turn --current
+//    e cita a linha de taxa da "pergunta atual" exatamente como impressa, no fim dessa mesma resposta.
+//    --current garante que os dados da rodada anterior nunca sejam apresentados como sendo desta
+//    (rodadas só de perguntas e respostas não geram saída).
+// A saída deve ser JSON estrito.
+// Configuração opcional ~/.zcode/tps-monitor.config.json:
+//   {"tokenRateLine": false} desativa toda a injeção de taxa.
 
 import fs from "node:fs";
 import os from "node:os";
@@ -25,16 +28,19 @@ if (sid) {
     const now = Date.now();
     fs.writeFileSync(
       file,
-      // promptTs:本次提问时刻,--current 守卫的唯一依据;Stop 钩子触发时会保留它而非覆盖
+      // promptTs: momento desta pergunta, único fundamento da guarda --current; quando o hook Stop dispara, ele preserva esse valor em vez de sobrescrevê-lo
       JSON.stringify({ sessionId: sid, ts: now, promptTs: now, source: "prompt-submit" })
     );
   } catch {}
 }
 
-// 本问统计指令(防折叠,0.8.4 起的严格顺序):模型在写最终回复正文之前自测当前提问的速率,
-// 统计行与回复正文同处最后一条消息。客户端把带工具调用的消息折叠进「模型轨迹」区,
-// 只有轮次最后一条纯文字消息默认展开——若模型先写完正文再补跑脚本、让统计行单独成条,
-// 用户就只能看到一行统计(正文全被收起)。故指令严格规定顺序并给出降级规则。
+// Instrução de estatística desta pergunta (anti-recolhimento, ordem estrita desde a 0.8.4): antes de
+// escrever o texto final da resposta, o modelo mede por conta própria a taxa da pergunta atual; a linha
+// de estatística fica na mesma mensagem que o texto final. O cliente recolhe mensagens com chamadas de
+// ferramenta para a área "trajetória do modelo", e apenas a última mensagem de texto puro do turno vem
+// expandida por padrão — se o modelo escrever o corpo primeiro e só depois rodar o script, deixando a
+// linha de estatística em mensagem separada, o usuário verá apenas a linha de estatística (com todo o
+// corpo recolhido). Por isso a instrução impõe a ordem rigorosamente e define uma regra de degradação.
 const TURN_STATS_INSTRUCTION = [
   "",
   "[estatistica deste turno] Se voce ja chamou ferramentas nesta resposta, finalize estritamente nesta ordem:",
@@ -66,8 +72,8 @@ try {
   if (cfg.tokenRateLine === false) {
     emit("");
   } else {
-    // 上一轮行仅作模型上下文(加 [contexto interno · nao mostrar] 前缀,明确禁止展示);
-    // 本问统计由模型按指令在写正文之前自测
+    // A linha da rodada anterior serve apenas como contexto do modelo (com o prefixo [contexto interno · nao mostrar],
+    // proibindo explicitamente a exibição); a estatística desta pergunta é medida pelo próprio modelo antes de escrever o corpo
     emit("[contexto interno · nao mostrar] resposta anterior: " + formatLine(query(sid || null)) + TURN_STATS_INSTRUCTION);
   }
 } catch {
