@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.8 — 2026-10-08
+
+### Barra de tok/s estilo DSH centralizada embaixo (Windows + Linux)
+- **Overlay Linux novo (`dashboard/overlay.py`)**: StatsLine no rodapé do composer no Linux X11 (GTK3 + `wmctrl`/`xprop`), com o mesmo padrão do DSH web — linha única centralizada sob o card do composer, texto terciário 13px (`#ADB2B8`), sem fundo, instância única, click-through, segue a janela principal e se oculta quando outra janela assume o foco. O `hooks/ensure-ui.mjs` passa a subir o overlay também no Linux.
+- **Overlay Windows alinhado ao mesmo padrão**: texto 12px → 13px terciário exato do DSH (`#ADB2B8` escuro / `#81858C` claro), altura 18 → 20px e teto do card 768 → 952px (conteúdo 920 + 32 do card, igual ao `--dsh-chat-content-width` do DSH web); a centralização continua pela mesma fórmula (card centralizado na coluna, faixa centralizada no card).
+- **`/tps-doctor` checa o overlay**: novo item informativo "Processo do overlay" (Windows: mutex/processo powershell; Linux: processo overlay.py; nunca falha, só informa).
+- Textos atualizados (READMEs, comando `/dashboard` com `xdg-open`/`open`, aviso do SessionStart sem o "(Windows)"); testes seguem 14/14 verdes.
+
 ## 0.8.7 — 2026-10-07
 
 ### Tradução completa para português (pt-BR)

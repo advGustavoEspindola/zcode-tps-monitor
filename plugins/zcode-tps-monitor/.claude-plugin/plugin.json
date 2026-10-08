@@ -1,6 +1,6 @@
 {
   "name": "zcode-tps-monitor",
-  "version": "0.8.7",
+  "version": "0.8.8",
   "description": "Monitor de TPS: comando /tps e ferramentas MCP para instantâneo de TPS, percentis de latência, taxa de erro e recursos do sistema local. Aceita URL de métricas real ou dados de demonstração embutidos para TPS de negócio.",
   "author": {
     "name": "Administrator"

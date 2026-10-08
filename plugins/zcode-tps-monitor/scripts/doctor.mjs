@@ -9,6 +9,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { execSync } from "node:child_process";
 
 process.removeAllListeners("warning");
 process.on("warning", () => {});
@@ -149,6 +150,42 @@ function dashboardCheck() {
   }
 }
 
+function overlayCheck() {
+  // Informativo: nunca falha (a barra e opcional, nao afeta a taxa na resposta)
+  try {
+    if (process.platform === "win32") {
+      const out = execSync(
+        'powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like \'*overlay.ps1*\' } | Select-Object -ExpandProperty ProcessId"',
+        { timeout: 5000, stdio: ["ignore", "pipe", "ignore"] }
+      ).toString().trim();
+      const pids = out.split(/\s+/).filter(Boolean);
+      return {
+        name: "Processo do overlay",
+        ok: true,
+        detail: pids.length ? `Em execução (PID ${pids.join(", ")})` : "Não está em execução (sobe sozinho na abertura da sessão)",
+        hint: null,
+      };
+    }
+    if (process.platform === "linux") {
+      const out = execSync("ps -eo args", { timeout: 5000, stdio: ["ignore", "pipe", "ignore"] })
+        .toString()
+        .split("\n")
+        // Caminho completo: evita casar com o proprio shell, greps ou buscas (ugrep/rg) por "overlay.py"
+        .filter((l) => l.includes("dashboard/overlay.py") && !/(grep|ugrep|\brg\b|doctor|execSync)/.test(l))
+        .map((l) => l.trim());
+      return {
+        name: "Processo do overlay",
+        ok: true,
+        detail: out.length ? "Em execução (overlay.py)" : "Não está em execução (sobe sozinho na abertura da sessão; requer python3 + GTK3 + wmctrl/xprop no X11)",
+        hint: null,
+      };
+    }
+    return { name: "Processo do overlay", ok: true, detail: "Plataforma sem overlay (use o painel :7423)", hint: null };
+  } catch {
+    return { name: "Processo do overlay", ok: true, detail: "Não foi possível verificar (sobe sozinho na abertura da sessão)", hint: null };
+  }
+}
+
 export async function runDoctor() {
   const results = [];
   results.push(nodeVersionCheck());
@@ -156,6 +193,7 @@ export async function runDoctor() {
   results.push(stateFileCheck());
   results.push(configCheck());
   results.push(dashboardCheck());
+  results.push(overlayCheck());
   return { checks: results, failed: results.filter((r) => !r.ok).length };
 }
 

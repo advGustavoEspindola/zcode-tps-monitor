@@ -49,3 +49,7 @@ if (process.platform === "win32") {
     path.join(root, "dashboard", "overlay.ps1"),
   ]);
 }
+
+if (process.platform === "linux") {
+  spawnDetached("python3", [path.join(root, "dashboard", "overlay.py")]);
+}

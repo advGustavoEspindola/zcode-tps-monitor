@@ -8,8 +8,8 @@
     {
       "name": "zcode-tps-monitor",
       "source": "./plugins/zcode-tps-monitor",
-      "description": "Monitor de taxa de tokens: anexa automaticamente ao fim de cada resposta que usa ferramentas a taxa instantânea da pergunta atual (nunca a do turno anterior) + painel de monitoramento em tempo real (com a taxa em andamento da pergunta atual) + comando /tps + ferramentas MCP; suporta URL de métricas real ou dados de demonstração.",
-      "version": "0.8.7",
+      "description": "Monitor de taxa de tokens: anexa automaticamente ao fim de cada resposta que usa ferramentas a taxa instantânea da pergunta atual (nunca a do turno anterior) + painel de monitoramento em tempo real (com a taxa em andamento da pergunta atual) + barra de tok/s estilo DSH no rodapé do composer (Windows/Linux) + comando /tps + ferramentas MCP; suporta URL de métricas real ou dados de demonstração.",
+      "version": "0.8.8",
       "author": {
         "name": "Administrator"
       },

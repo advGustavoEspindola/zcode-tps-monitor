@@ -32,7 +32,7 @@ const hint = [
   `[zcode-tps-monitor] pronto. No fim de cada resposta que chamou ferramentas: rode node "${RATE_SCRIPT}" --turn --current ANTES de escrever o texto final, depois escreva a resposta completa e coloque a linha impressa intacta em um bloco de citacao Markdown no fim dessa mesma mensagem; sem saida do script (ex.: pergunta pura) nao ha linha de estatistica.`,
   "A linha de estatistica deve estar na mesma mensagem do texto final: nunca chame ferramentas depois do texto e nunca deixe a linha de estatistica vir sozinha — o cliente recolhe mensagens com ferramentas e o usuario veria so a linha.",
   "A linha de contexto interno \"(turno anterior)\" e so historico para voce; nunca a mostre ao usuario.",
-  "Comandos: /tps (instantaneo), /tps-doctor (autodiagnostico). Dash: http://127.0.0.1:7423 e a faixa de tok/s no rodape do composer (estilo DSH, Windows) sobem sozinhos na abertura da sessao. Desligar injecao: ~/.zcode/tps-monitor.config.json → {\"tokenRateLine\":false}; exibir a taxa direto pelo Stop hook (experimental, 1x por turno): {\"stopHookLine\":true}.",
+  "Comandos: /tps (instantaneo), /tps-doctor (autodiagnostico). Dash: http://127.0.0.1:7423 e a faixa de tok/s no rodape do composer (estilo DSH) sobem sozinhos na abertura da sessao. Desligar injecao: ~/.zcode/tps-monitor.config.json → {\"tokenRateLine\":false}; exibir a taxa direto pelo Stop hook (experimental, 1x por turno): {\"stopHookLine\":true}.",
 ].join("");
 
 process.stdout.write(

@@ -1,5 +1,7 @@
 # zcode-tps-monitor: StatsLine estilo DSH no rodape do composer do ZCode.
-# Texto cinza 12px, sem fundo, dentro do card. Fechar: encerrar o processo overlay.
+# Segue o padrao StatsPills do DSH web: linha unica centralizada sob o card do
+# composer (justify-content:center, largura maxima do card), texto terciario
+# 13px/20px sem fundo. Fechar: encerrar o processo overlay.
 # Uma instancia so (mutex). Segue a janela principal do ZCode.
 
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
@@ -64,8 +66,8 @@ $mutex = New-Object System.Threading.Mutex($false, "Global\ZCodeTpsMonitorOverla
 if (-not $mutex.WaitOne(0)) { exit 0 }
 
 $script:STRIP_W = 640
-$STRIP_H = 18
-$FSZ = 12
+$STRIP_H = 20
+$FSZ = 13
 $URL = "http://127.0.0.1:7423/api/token-rate"
 # Padding interno do card, abaixo da toolbar (send ~48px do fundo da janela).
 $script:offY = -30
@@ -77,8 +79,8 @@ $DOT = [char]0x00B7
 $inv = [System.Globalization.CultureInfo]::InvariantCulture
 
 $INK = @{
-  dark  = @{ main = "#FF8B94AD" }
-  light = @{ main = "#FF8A8F99" }
+  dark  = @{ main = "#FFADB2B8" }
+  light = @{ main = "#FF81858C" }
 }
 
 function Get-ZCodeLuminance($r) {
@@ -217,7 +219,7 @@ function Place-Default([object]$r) {
   if ($winW -lt 900) { $sidebar = 0 }
   if ($winW -gt 1400) { $right = 360 }
   $contentW = [Math]::Max(420, $winW - $sidebar - $right - 24)
-  $cardW = [Math]::Min(768, $contentW - 48)
+  $cardW = [Math]::Min(952, $contentW - 48)
   $script:STRIP_W = [Math]::Max(420, $cardW - 32)
   Apply-Scale
   $cardLeft = $r.Left + $sidebar + [int](($contentW - $cardW) / 2)

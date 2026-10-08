@@ -1,6 +1,6 @@
 {
   "name": "zcode-tps-monitor",
-  "version": "0.8.7",
+  "version": "0.8.8",
   "description": "Monitor de taxa de saída de tokens do ZCode: exibe a taxa instantânea real de tokens/s (lida do banco de uso do ZCode) da pergunta atual no fim de cada resposta que usa ferramentas — nunca a do turno anterior — mais o comando /tps, ferramentas MCP e um painel em tempo real; também suporta monitoramento de TPS de negócio via URL de métricas configurável ou dados de demonstração.",
   "description_i18n": {
     "pt-BR": "Monitor de TPS: comando /tps e ferramentas MCP para instantâneo de TPS, percentis de latência, taxa de erro e recursos locais. Aceita URL de métricas real ou dados de demonstração embutidos."

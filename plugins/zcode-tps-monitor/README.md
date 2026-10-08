@@ -12,7 +12,7 @@ A apresentação do projeto, a instalação e as instruções de uso estão no [
 | Bootstrap do UI | `hooks/ensure-ui.mjs` | Após o SessionStart, garante em segundo plano que o painel (dashboard) em `:7423` e a barra de tok/s no desktop estejam em execução (só inicia se estiverem ausentes; falhas são silenciosas) |
 | Autodiagnóstico | `/tps-doctor` (`scripts/doctor.mjs`) | Verifica a versão do Node, o banco de dados e o esquema das tabelas, os arquivos de estado/configuração e o processo do dashboard; `--json` permite consumo programático |
 | Dashboard em tempo real | `dashboard/server.mjs` | Painel de monitoramento no navegador, com atualização automática a cada segundo, incluindo o cartão em tempo real da "pergunta mais recente (pergunta atual)"; iniciado por `/zcode-tps-monitor:dashboard` ou executado manualmente |
-| Barra de tok/s | `dashboard/overlay.ps1` | No Windows, uma StatsLine fixada na parte inferior do composer do ZCode (estilo DSH): texto cinza, sem fundo, instância única, acompanhando a janela principal |
+| Barra de tok/s | `dashboard/overlay.ps1` (Windows) / `dashboard/overlay.py` (Linux X11) | StatsLine fixada na parte inferior do composer do ZCode (estilo DSH): linha única centralizada sob o card do composer, texto terciário 13px sem fundo, instância única, acompanhando a janela principal |
 | Comando slash | `/zcode-tps-monitor:tps` | Instantâneo imediato; `/zcode-tps-monitor:tps 10` faz amostragem por 10 segundos |
 | Skill | `zcode-tps-monitor` | Acionado automaticamente quando o usuário pergunta sobre taxa/TPS |
 | Ferramentas MCP | `tps_snapshot` / `tps_watch` | Servidor MCP via stdio (`mcp/tps-server.mjs`), para o agent obter dados programaticamente |
@@ -93,7 +93,8 @@ zcode-tps-monitor/
 ├── dashboard/
 │   ├── server.mjs              # servidor HTTP (página + /api/metrics)
 │   ├── index.html              # layout do dashboard (puro nativo, sem dependências externas)
-│   └── overlay.ps1             # barra flutuante do Windows
+│   ├── overlay.ps1             # barra do Windows (WPF)
+│   └── overlay.py              # barra do Linux X11 (GTK3, mesmo padrão DSH)
 ├── scripts/
 │   ├── token-rate.mjs          # CLI de taxa de tokens (legível para humanos / --json)
 │   ├── collect.mjs             # entrada do CLI de TPS de negócio

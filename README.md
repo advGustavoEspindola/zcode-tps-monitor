@@ -33,7 +33,7 @@ Regras de exibição de números: em cada pergunta, "saida" usa número exato co
 - **Painel (dashboard) de monitoramento em tempo real** — `/zcode-tps-monitor:dashboard` inicia com um clique; painel em estilo escuro de operações no navegador, com atualização automática a cada segundo; sai automaticamente após 3 horas ocioso, sem deixar processos em segundo plano
 - **Comandos de barra** — `/tps` para uma fotografia instantânea; `/tps 10` para amostrar por 10 segundos; `/tps-doctor` para autodiagnóstico do ambiente
 - **Ferramentas MCP** — `tps_snapshot` / `tps_watch`, para que o agent obtenha dados de forma programática
-- **Barra flutuante (Windows)** — barra de texto flutuante permanente na área de trabalho, com a taxa atual sempre visível
+- **Barra de tok/s estilo DSH** — StatsLine permanente centralizada abaixo do composer, com a taxa atual sempre visível (Windows via `dashboard/overlay.ps1`, Linux X11 via `dashboard/overlay.py`)
 - **Monitoramento de TPS de negócio (opcional)** — configure `metrics_url` para conectar a uma interface real de métricas de negócio ou use os dados de demonstração embutidos
 
 ## Instalação
@@ -68,7 +68,7 @@ Depois de atualizar, reinstale/atualize o plugin e reabra a sessão para que os 
 | Abrir o painel de monitoramento | Digite `/zcode-tps-monitor:dashboard`, ou manualmente `node dashboard/server.mjs` |
 | Autodiagnóstico do ambiente | A linha de taxa desapareceu? Digite `/tps-doctor` para verificar item a item |
 | Desativar a injeção da taxa (incluindo a linha de estatísticas no final) | Escreva `{"tokenRateLine": false}` em `~/.zcode/tps-monitor.config.json`; reabra a sessão para surtir efeito |
-| Barra flutuante na área de trabalho | Execute `dashboard/overlay.ps1` (Windows) |
+| Barra de tok/s estilo DSH | Automática via hook (Windows: `dashboard/overlay.ps1`, Linux X11: `dashboard/overlay.py`); ou manual com o mesmo comando |
 | Obtenção de dados pelo agent | Ferramentas MCP `tps_snapshot` / `tps_watch` |
 
 Requer Node ≥ 22.5 (é necessário o `node:sqlite` embutido; o mesmo vale para Windows / macOS / Linux).
@@ -139,7 +139,7 @@ A: execute `/tps-doctor` para o autodiagnóstico. Causas comuns: versão do Node
 
 **Q: há suporte a macOS / Linux?**
 
-A: sim. Os hooks, comandos, painel e MCP são todas implementações Node multiplataforma; o caminho do banco de usage é resolvido automaticamente a partir do diretório inicial do usuário (`~/.zcode/cli/db/db.sqlite`), e pode ser sobrescrito pela variável de ambiente `ZCODE_USAGE_DB` em instalações fora do padrão. A única exceção é a barra flutuante na área de trabalho `overlay.ps1`, que depende da API do Windows e é exclusiva de Windows (no macOS, basta usar o painel de monitoramento).
+A: sim. Os hooks, comandos, painel e MCP são todas implementações Node multiplataforma; o caminho do banco de usage é resolvido automaticamente a partir do diretório inicial do usuário (`~/.zcode/cli/db/db.sqlite`), e pode ser sobrescrito pela variável de ambiente `ZCODE_USAGE_DB` em instalações fora do padrão. A barra de tok/s estilo DSH no rodapé do composer funciona no Windows (`overlay.ps1`, WPF) e no Linux X11 (`overlay.py`, GTK3 + `wmctrl`/`xprop`); no macOS, use o painel de monitoramento.
 
 **Q: como desativo os dados de demonstração?**
 
